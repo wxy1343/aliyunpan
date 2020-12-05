@@ -88,6 +88,7 @@ def upload_file(Authorization, drive_id, parent_file_id='root', path=None):
         "type": "file",
         "size": file_size,
         "drive_id": drive_id,
+        # 上传的目录(默认root就是主目录)
         "parent_file_id": parent_file_id,
         "part_info_list": part_info_list,
         "content_hash_name": "sha1",
@@ -156,6 +157,7 @@ def upload_file(Authorization, drive_id, parent_file_id='root', path=None):
 if __name__ == '__main__':
     Authorization = '抓包获取access_token'
     user_info = get_user(Authorization)
+    # 必要参数
     drive_id = user_info['default_drive_id']
     # get_list(Authorization, drive_id)
     upload_file(Authorization, drive_id, path='要上传的文件的路径')
