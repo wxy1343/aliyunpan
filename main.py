@@ -1,39 +1,55 @@
-import requests
-import os
 import hashlib
-import time
-import sys
 import math
+import os
+import sys
+import time
 from multiprocessing.dummy import Pool, Queue
+
+import requests
+
 pool = Pool(5)
 q = Queue(maxsize=5)
 
 
-def get_list(Authorization, drive_id, parent_file_id='root'):
+def get_list(access_token, drive_id, parent_file_id='root'):
     """
     获取文件列表
     """
     url = 'https://api.aliyundrive.com/v2/file/list'
-    headers = {'User-Agent': None, 'Authorization': Authorization}
+    headers = {'User-Agent': None, 'Authorization': access_token}
     json = {"drive_id": drive_id, "parent_file_id": parent_file_id}
     r = requests.post(url, headers=headers, json=json)
     return r.json()
 
 
-def get_user(Authorization):
+def get_user(access_token):
     """
     获取用户信息
     """
     url = 'https://api.aliyundrive.com/v2/user/get'
-    headers = {'User-Agent': None, 'Authorization': Authorization}
+    headers = {'User-Agent': None, 'Authorization': access_token}
     r = requests.post(url, headers=headers, json={})
     return r.json()
 
 
-def upload_file(Authorization, drive_id, parent_file_id='root', path=None):
+def refresh(refresh_token):
+    """
+    获取access_token
+    :param refresh_token: 
+    :return: access_token
+    """
+    url = 'https://websv.aliyundrive.com/token/refresh'
+    json = {"refresh_token": refresh_token}
+    headers = {'User-Agent': None}
+    r = requests.post(url, json=json, headers=headers)
+    return r.json()['access_token']
+
+
+def upload_file(access_token, drive_id, parent_file_id='root', path=None):
     """
     上传文件
     """
+
     def upload(kwargs):
         part_number, upload_url, chunk = kwargs['part_number'], kwargs[
             'upload_url'], kwargs['chunk']
@@ -65,7 +81,7 @@ def upload_file(Authorization, drive_id, parent_file_id='root', path=None):
             'time': end_time - start_time
         })
 
-    split_size = 5242880 # 默认5MB分片大小(不要改)
+    split_size = 5242880  # 默认5MB分片大小(不要改)
     file_size = os.path.getsize(path)
     _, file_name = os.path.split(path)
     # 获取sha1
@@ -88,7 +104,6 @@ def upload_file(Authorization, drive_id, parent_file_id='root', path=None):
         "type": "file",
         "size": file_size,
         "drive_id": drive_id,
-        # 上传的目录(默认root就是主目录)
         "parent_file_id": parent_file_id,
         "part_info_list": part_info_list,
         "content_hash_name": "sha1",
@@ -98,7 +113,7 @@ def upload_file(Authorization, drive_id, parent_file_id='root', path=None):
     }
     # 申请创建文件
     url = 'https://api.aliyundrive.com/v2/file/create'
-    headers = {'User-Agent': None, 'Authorization': Authorization}
+    headers = {'User-Agent': None, 'Authorization': access_token}
     r = requests.post(url, headers=headers, json=json)
     # 如果存在匹配的hash值的文件则不会重复上传
     rapid_upload = r.json()['rapid_upload']
@@ -114,7 +129,7 @@ def upload_file(Authorization, drive_id, parent_file_id='root', path=None):
         total_time = 0
         count_size = 0
         k = 0
-        sys.stdout.write(f'\r上传中... [{"*"*10}] %0')
+        sys.stdout.write(f'\r上传中... [{"*" * 10}] %0')
         with open(path, 'rb') as f:
             # 开启多线程上传
             result = pool.map_async(upload, [{
@@ -131,7 +146,7 @@ def upload_file(Authorization, drive_id, parent_file_id='root', path=None):
                 k += size / file_size
                 count_size += size
                 sys.stdout.write(
-                    f'\r上传中... [{"="*int(k*10)}{"*"*int((1-k)*10)}] %{math.ceil(k*1000)/10}'
+                    f'\r上传中... [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10}'
                 )
                 if count_size == file_size:
                     break
@@ -148,16 +163,16 @@ def upload_file(Authorization, drive_id, parent_file_id='root', path=None):
         if r.status_code == 200:
             total_time = int(total_time * 100) / 100
             print(
-                f'\n上传成功,耗时{int(total_time*100)/100}秒,平均速度{int(file_size/1024/1024/total_time*100)/100}MB/s'
+                f'\n上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{int(file_size / 1024 / 1024 / total_time * 100) / 100}MB/s'
             )
         else:
             print('\n上传失败')
 
 
 if __name__ == '__main__':
-    Authorization = '抓包获取access_token'
-    user_info = get_user(Authorization)
-    # 必要参数
+    refresh_token = '在Chrome Application中获取'
+    access_token = refresh(refresh_token)
+    user_info = get_user(access_token)
     drive_id = user_info['default_drive_id']
-    # get_list(Authorization, drive_id)
-    upload_file(Authorization, drive_id, path='要上传的文件的路径')
+    # get_list(access_token, drive_id)
+    upload_file(access_token, drive_id, path='文件路径')
