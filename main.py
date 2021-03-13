@@ -4,7 +4,6 @@ import os
 import sys
 import time
 from multiprocessing.dummy import Pool, Queue
-
 import requests
 
 pool = Pool(5)
@@ -35,8 +34,8 @@ def get_user(access_token):
 def refresh(refresh_token):
     """
     获取access_token
-    :param refresh_token: 
-    :return: access_token
+    :param refresh_token:
+    :return: __access_token
     """
     url = 'https://websv.aliyundrive.com/token/refresh'
     json = {"refresh_token": refresh_token}
@@ -51,11 +50,13 @@ def upload_file(access_token, drive_id, parent_file_id='root', path=None):
     """
 
     def upload(kwargs):
-        part_number, upload_url, chunk = kwargs['part_number'], kwargs[
-            'upload_url'], kwargs['chunk']
-        size = len(chunk)
+        part_number, upload_url, path = kwargs.values()
+        with open(path, 'rb') as f:
+            f.seek((part_number - 1) * split_size)
+            chunk = f.read(split_size)
         if not chunk:
             return
+        size = len(chunk)
         # 等待上一个线程上传完毕(本来想搞多线程上传的,但是网盘不支持,也懒得改了)
         while True:
             if part_number == 1:
@@ -130,26 +131,25 @@ def upload_file(access_token, drive_id, parent_file_id='root', path=None):
         count_size = 0
         k = 0
         sys.stdout.write(f'\r上传中... [{"*" * 10}] %0')
-        with open(path, 'rb') as f:
-            # 开启多线程上传
-            result = pool.map_async(upload, [{
-                'part_number': i['part_number'],
-                'upload_url': i['upload_url'],
-                'chunk': f.read(split_size)
-            } for i in part_info_list])
-            # 等待线程通知
-            while True:
-                data = q.get()
-                part_info_list_new.append(data['part_info_list'])
-                size = data['size']
-                total_time += data['time']
-                k += size / file_size
-                count_size += size
-                sys.stdout.write(
-                    f'\r上传中... [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10}'
-                )
-                if count_size == file_size:
-                    break
+        # 开启多线程上传
+        pool.map_async(upload, [{
+            'part_number': i['part_number'],
+            'upload_url': i['upload_url'],
+            'path': path
+        } for i in part_info_list])
+        # 等待线程通知
+        while True:
+            data = q.get()
+            part_info_list_new.append(data['part_info_list'])
+            size = data['size']
+            total_time += data['time']
+            k += size / file_size
+            count_size += size
+            sys.stdout.write(
+                f'\r上传中... [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10}'
+            )
+            if count_size == file_size:
+                break
         # 上传完成保存文件
         url = 'https://api.aliyundrive.com/v2/file/complete'
         json = {
@@ -170,9 +170,10 @@ def upload_file(access_token, drive_id, parent_file_id='root', path=None):
 
 
 if __name__ == '__main__':
-    refresh_token = '在Chrome Application中获取'
+    refresh_token = '在Chrome DevTools Application中获取'
     access_token = refresh(refresh_token)
     user_info = get_user(access_token)
     drive_id = user_info['default_drive_id']
     # get_list(access_token, drive_id)
     upload_file(access_token, drive_id, path='文件路径')
+  
