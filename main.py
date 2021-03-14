@@ -5,6 +5,7 @@ import sys
 import time
 from multiprocessing.dummy import Pool, Queue
 import requests
+import traceback
 
 pool = Pool(5)
 q = Queue(maxsize=5)
@@ -67,7 +68,21 @@ def upload_file(access_token, drive_id, parent_file_id='root', path=None):
             else:
                 q_pool.put(data)
         start_time = time.time()
-        r = requests.put(upload_url, headers=headers, data=chunk)
+        while True:
+            try:
+                # 开始上传
+                r = requests.put(upload_url, headers=headers, data=chunk)
+                break
+            except requests.exceptions.RequestException:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                print('\r\nError:' + exc_type.__name__)
+            # 重试等待时间
+            n = 3
+            while n:
+                sys.stdout.write(f'\r{n}秒后重试')
+                n -= 1
+                time.sleep(1)
+            sys.stdout.write('\r')
         end_time = time.time()
         etag = r.headers['ETag']
         # 通知下一个线程上传
@@ -176,4 +191,3 @@ if __name__ == '__main__':
     drive_id = user_info['default_drive_id']
     # get_list(access_token, drive_id)
     upload_file(access_token, drive_id, path='文件路径')
-  
