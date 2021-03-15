@@ -4,12 +4,7 @@ import os
 import sys
 import time
 import func_timeout
-from multiprocessing.dummy import Pool, Queue
 import requests
-from func_timeout import func_set_timeout
-
-pool = Pool(5)
-q = Queue(maxsize=5)
 
 
 def get_list(access_token, drive_id, parent_file_id='root'):
@@ -37,7 +32,7 @@ def refresh(refresh_token):
     """
     获取access_token
     :param refresh_token:
-    :return: __access_token
+    :return: _access_token
     """
     url = 'https://websv.aliyundrive.com/token/refresh'
     json = {"refresh_token": refresh_token}
@@ -46,64 +41,17 @@ def refresh(refresh_token):
     return r.json()['access_token']
 
 
-def upload_file(access_token, drive_id, parent_file_id='root', path=None, timeout=10):
+def upload_file(access_token, drive_id, parent_file_id='root', path=None, timeout=10, retry_num=3):
     """
     上传文件
+    :param retry_num:
+    :param access_token:
+    :param drive_id:
+    :param parent_file_id: 上传目录的id
+    :param path: 上传文件路径
+    :param timeout: 上传超时时间
+    :return:
     """
-
-    def upload(kwargs):
-        part_number, upload_url, path = kwargs.values()
-        with open(path, 'rb') as f:
-            f.seek((part_number - 1) * split_size)
-            chunk = f.read(split_size)
-        if not chunk:
-            return
-        size = len(chunk)
-        # 等待上一个线程上传完毕(本来想搞多线程上传的,但是网盘不支持,也懒得改了)
-        while True:
-            if part_number == 1:
-                break
-            data = q_pool.get()
-            if data == part_number - 1:
-                break
-            else:
-                q_pool.put(data)
-        start_time = time.time()
-        while True:
-            try:
-                # 开始上传
-                @func_set_timeout(timeout)
-                def put():
-                    return requests.put(upload_url, headers=headers, data=chunk, timeout=timeout)
-
-                r = put()
-                break
-            except requests.exceptions.RequestException:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                print('\r\nError:' + exc_type.__name__)
-            except func_timeout.exceptions.FunctionTimedOut:
-                print('\r\nError:上传超时')
-            # 重试等待时间
-            n = 3
-            while n:
-                sys.stdout.write(f'\r{n}秒后重试')
-                n -= 1
-                time.sleep(1)
-            sys.stdout.write('\r')
-        end_time = time.time()
-        etag = r.headers['ETag']
-        # 通知下一个线程上传
-        q_pool.put(part_number)
-        # 通知主线程
-        q.put({
-            'part_info_list': {
-                'part_number': part_number,
-                'etag': etag
-            },
-            'size': size,
-            'time': end_time - start_time
-        })
-
     split_size = 5242880  # 默认5MB分片大小(不要改)
     file_size = os.path.getsize(path)
     _, file_name = os.path.split(path)
@@ -143,8 +91,6 @@ def upload_file(access_token, drive_id, parent_file_id='root', path=None, timeou
     if rapid_upload:
         print('快速上传成功')
     else:
-        # 多线程队列
-        q_pool = Queue(maxsize=5)
         upload_id = r.json()['upload_id']
         file_id = r.json()['file_id']
         part_info_list = r.json()['part_info_list']
@@ -152,26 +98,51 @@ def upload_file(access_token, drive_id, parent_file_id='root', path=None, timeou
         total_time = 0
         count_size = 0
         k = 0
-        sys.stdout.write(f'\r上传中... [{"*" * 10}] %0')
-        # 开启多线程上传
-        pool.map_async(upload, [{
-            'part_number': i['part_number'],
-            'upload_url': i['upload_url'],
-            'path': path
-        } for i in part_info_list])
-        # 等待线程通知
-        while True:
-            data = q.get()
-            part_info_list_new.append(data['part_info_list'])
-            size = data['size']
-            total_time += data['time']
+        upload_info = f'\r上传中... [{"*" * 10}] %0'
+        for i in part_info_list:
+            part_number, upload_url = i['part_number'], i['upload_url']
+            with open(path, 'rb') as f:
+                f.seek((part_number - 1) * split_size)
+                chunk = f.read(split_size)
+            if not chunk:
+                break
+            size = len(chunk)
+            retry_count = 0
+            start_time = time.time()
+            while True:
+                if upload_info:
+                    sys.stdout.write(upload_info)
+                try:
+                    # 开始上传
+                    func_timeout.func_timeout(timeout, lambda: requests.put(upload_url, headers=headers, data=chunk,
+                                                                            timeout=timeout))
+                    break
+                except requests.exceptions.RequestException:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    sys.stdout.write(f'\rError:{exc_type.__name__}')
+                    time.sleep(1)
+                except func_timeout.exceptions.FunctionTimedOut:
+                    if retry_count is retry_num:
+                        sys.stdout.write(f'\rError:上传超时{retry_num}次，即将重新上传')
+                        time.sleep(1)
+                        return upload_file(access_token, drive_id, parent_file_id, path, timeout)
+                    sys.stdout.write(f'\rError:上传超时')
+                    retry_count += 1
+                    time.sleep(1)
+                # 重试等待时间
+                n = 3
+                while n:
+                    sys.stdout.write(f'\r{n}秒后重试')
+                    n -= 1
+                    time.sleep(1)
+                sys.stdout.write('\r')
+            end_time = time.time()
+            t = end_time - start_time
+            total_time += t
             k += size / file_size
             count_size += size
-            sys.stdout.write(
-                f'\r上传中... [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10} {round(count_size / 1024 / 1024 / total_time, 2)}MB/s'
-            )
-            if count_size == file_size:
-                break
+            upload_info = f'\r上传中{"." * (part_number % 4)} [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10} {round(count_size / 1024 / 1024 / total_time, 2)}MB/s'
+            sys.stdout.write(upload_info)
         # 上传完成保存文件
         url = 'https://api.aliyundrive.com/v2/file/complete'
         json = {
