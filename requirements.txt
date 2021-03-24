@@ -1,0 +1,6 @@
+requests==2.22.0
+treelib==1.6.1
+nest_asyncio==1.5.1
+aiofile==3.5.0
+click_aliases==1.0.1
+click==7.1.1
