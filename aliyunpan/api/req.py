@@ -30,7 +30,7 @@ class Req:
             else:
                 kwargs['headers'] = self._headers
             r = getattr(self._session, method)(*args, **kwargs)
-            logger.debug('\n'.join((map(lambda x: str(x), (r.status_code, r.text.strip())))))
+            logger.debug(r.status_code)
             return r
         except requests.exceptions.RequestException:
             raise

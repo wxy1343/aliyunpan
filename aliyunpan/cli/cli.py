@@ -76,7 +76,7 @@ class Commander:
                 if file_list:
                     for file in file_list:
                         if file.download_url:
-                            p = os.path.join(save_path, path.lstrip('/'), file.name)
+                            p = os.path.join(save_path, path.lstrip('/'))
                             if os.path.exists(p):
                                 temp_size = os.path.getsize(p)
                             else:
