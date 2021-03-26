@@ -46,7 +46,7 @@ class Commander:
         for path in path_list:
             if path:
                 if os.path.isfile(path):
-                    self._disk.upload_file(upload_path, path, timeout, retry, force)
+                    self._disk.upload_file(self._path_list.get_path_fid(upload_path), path, timeout, retry, force)
                 elif os.path.isdir(path):
                     if upload_path == 'root':
                         upload_path = '/'
