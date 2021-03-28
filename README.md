@@ -16,6 +16,7 @@
 |rm (del,delete)     |删除文件/文件夹                  |
 |tree (show,t)       |查看文件树                      |
 |upload (u)          |上传文件/文件夹                  |
+|share (s)           |分享文件                        |
 
 # 使用指南
 

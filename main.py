@@ -71,6 +71,17 @@ def tree(path):
     commander.tree(path)
 
 
+@cli.command(aliases=['s'], help='Share file download link.')
+@click.help_option('-h', '--help')
+@click.argument('path', type=click.Path(), default='')
+@click.option('-f', '--file-id', type=str, default='', help='File id.')
+def share(path, file_id):
+    if path or file_id:
+        commander.share(path, file_id)
+    else:
+        raise click.MissingParameter(param=click.get_current_context().command.params[1])
+
+
 if __name__ == '__main__':
     commander = Commander()
     cli.add_command(ls)

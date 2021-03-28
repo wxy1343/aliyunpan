@@ -42,6 +42,9 @@ class PathList:
 
     def get_path_list(self, path):
         file_id = self.get_path_fid(path)
+        return self.get_fid_list(file_id)
+
+    def get_fid_list(self, file_id):
         if not file_id:
             raise Exception('No such file or directory')
         if file_id != 'root' and self._tree.get_node(file_id).data.type:
@@ -67,3 +70,13 @@ class PathList:
         if flag:
             return file_id
         return False
+
+    def get_path_node(self, path):
+        file_id = self.get_path_fid(path)
+        if file_id:
+            return self._tree.get_node(file_id)
+        return False
+
+    def get_node_by_file_id(self, file_id):
+        self.update_path_list()
+        return self._tree.get_node(file_id)

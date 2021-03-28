@@ -163,10 +163,11 @@ class AliyunPan(object):
         for i in range(count):
             part_info_list.append({"part_number": i + 1})
         json = {"size": file_size, "part_info_list": part_info_list, "content_hash": content_hash}
+        print(f'[*][upload]{path}')
         # 申请创建文件
         r = self.create_file(file_name, parent_file_id, True, json, force)
         if r.json()['rapid_upload']:
-            print(path, '快速上传成功')
+            print(f'[+][upload]{path}\t快速上传成功')
         else:
             upload_id = r.json()['upload_id']
             file_id = r.json()['file_id']
@@ -233,18 +234,20 @@ class AliyunPan(object):
             r = await self._req.post_async(url, headers=headers, json=json)
             if r.status_code == 200:
                 total_time = int(total_time * 100) / 100
-                print(path,
-                      f'\n上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{round(file_size / 1024 / 1024 / total_time)}MB/s')
+                print(
+                    f'\n[+][upload]{path}\t上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{round(file_size / 1024 / 1024 / total_time)}MB/s')
             else:
-                print(path, '\n上传失败')
+                print(f'\n[-][upload]{path}')
 
     def get_access_token(self) -> str:
         """
         获取access_token
         """
         access_token = None
-        url = 'https://websv.aliyundrive.com/token/refresh'
-        json = {"refresh_token": self.refresh_token}
+        # url = 'https://websv.aliyundrive.com/token/refresh'
+        # json = {"refresh_token": self.refresh_token}
+        url = 'https://auth.aliyundrive.com/v2/account/token'
+        json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
         while True:
             if access_token:
                 yield access_token
