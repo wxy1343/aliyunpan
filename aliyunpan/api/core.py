@@ -233,10 +233,10 @@ class AliyunPan(object):
             r = await self._req.post_async(url, headers=headers, json=json)
             if r.status_code == 200:
                 total_time = int(total_time * 100) / 100
-                print(path,
-                      f'\n上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{round(file_size / 1024 / 1024 / total_time)}MB/s')
+                print(f'\n上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{round(file_size / 1024 / 1024 / total_time)}MB/s',
+                      path)
             else:
-                print(path, '\n上传失败')
+                print('\n上传失败', path)
 
     def get_access_token(self) -> str:
         """
