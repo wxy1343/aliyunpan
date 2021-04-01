@@ -75,9 +75,10 @@ def tree(path):
 @click.help_option('-h', '--help')
 @click.argument('path', type=click.Path(), default='')
 @click.option('-f', '--file-id', type=str, default='', help='File id.')
-def share(path, file_id):
+@click.option('-t', '--expire-sec', type=int, default=14400, help='Link expiration time(Max 14400).', show_default=True)
+def share(path, file_id, expire_sec):
     if path or file_id:
-        commander.share(path, file_id)
+        commander.share(path, file_id, expire_sec)
     else:
         raise click.MissingParameter(param=click.get_current_context().command.params[1])
 

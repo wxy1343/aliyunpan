@@ -132,9 +132,9 @@ class Commander:
         print(f'[+][download]{path}')
         return True
 
-    def share(self, path, file_id):
+    def share(self, path, file_id, expire_sec):
         if path:
             file = self._path_list.get_path_node(path).data
         else:
             file = self._path_list.get_node_by_file_id(file_id).data
-        print(file.download_url)
+        print(self._disk.get_download_url(file.id, expire_sec))

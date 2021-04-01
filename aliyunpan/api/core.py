@@ -37,6 +37,8 @@ class AliyunPan(object):
     async def get_file_list(self, parent_file_id: str = 'root') -> dict:
         """
         获取文件列表
+        :param parent_file_id:
+        :return:
         """
         url = 'https://api.aliyundrive.com/v2/file/list'
         json = {"drive_id": self.drive_id, "parent_file_id": parent_file_id}
@@ -48,6 +50,8 @@ class AliyunPan(object):
     async def delete_file(self, file_id: str):
         """
         删除文件
+        :param file_id:
+        :return:
         """
         url = 'https://api.aliyundrive.com/v2/batch'
         json = {'requests': [{'body': {'drive_id': self.drive_id, 'file_id': file_id},
@@ -64,6 +68,9 @@ class AliyunPan(object):
     async def move_file(self, file_id: str, path_file_id: str):
         """
         移动文件
+        :param file_id:
+        :param path_file_id:
+        :return:
         """
         url = 'https://api.aliyundrive.com/v2/batch'
         json = {"requests": [{"body": {"drive_id": self.drive_id, "file_id": file_id,
@@ -100,6 +107,12 @@ class AliyunPan(object):
                           json: dict = None, force: bool = False):
         """
         创建文件
+        :param file_name:
+        :param parent_file_id:
+        :param file_type:
+        :param json:
+        :param force:
+        :return:
         """
         if parent_file_id == '' or parent_file_id == '/':
             parent_file_id = 'root'
@@ -242,6 +255,7 @@ class AliyunPan(object):
     def get_access_token(self) -> str:
         """
         获取access_token
+        :return:
         """
         access_token = None
         # url = 'https://websv.aliyundrive.com/token/refresh'
@@ -258,6 +272,7 @@ class AliyunPan(object):
     def get_drive_id(self) -> str:
         """
         获取drive_id
+        :return:
         """
         drive_id = None
         while True:
@@ -265,3 +280,16 @@ class AliyunPan(object):
                 yield drive_id
             else:
                 drive_id = self._loop.run_until_complete(self.get_user_info()).drive_id
+
+    def get_download_url(self, file_id, expire_sec=14400):
+        """
+        获取分享链接
+        :param file_id:
+        :param expire_sec: 文件过期时间（秒）
+        :return:
+        """
+        url = 'https://api.aliyundrive.com/v2/file/get_download_url'
+        headers = {'Authorization': self.access_token}
+        json = {'drive_id': self.drive_id, 'file_id': file_id, 'expire_sec': expire_sec}
+        r = self._req.post(url, json=json, headers=headers)
+        return r.json()['url']
