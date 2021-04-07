@@ -85,6 +85,4 @@ def share(path, file_id, expire_sec):
 
 if __name__ == '__main__':
     commander = Commander()
-    cli.add_command(ls)
-    cli.add_command(upload)
     cli()
