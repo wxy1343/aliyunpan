@@ -1,5 +1,9 @@
+#!/usr/bin/env python3
+
 import click
 from click_aliases import ClickAliasedGroup
+import os
+import yaml
 
 from aliyunpan.cli.cli import Commander
 
@@ -7,10 +11,15 @@ from aliyunpan.cli.cli import Commander
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
 @click.version_option(version='0.1')
-@click.argument('refresh_token', type=str, default='')
-def cli(refresh_token):
-    commander.disk_init(refresh_token)
-
+# @click.argument('refresh_token', type=str, default='')
+def cli(refresh_token = ""):
+    conf_file =  "~/.config/aliyunpan.yaml"
+    spectify_conf_file = os.environ.get("ALIYUNPAN_CONF", "")
+    if os.path.isfile(spectify_conf_file):
+        conf_file =  spectify_conf_file
+    with open(os.path.expanduser(conf_file)) as f:
+        conf = yaml.safe_load(f)
+        commander.disk_init(conf["refresh_token"])
 
 @cli.command(aliases=['l', 'list', 'dir'], help='List files.')
 @click.help_option('-h', '--help')
