@@ -6,9 +6,18 @@
 
 ![token](https://github.com/wxy1343/aliyunpan/raw/main/token.png)
 
+## 注意
+
+* web端获取的refresh_token暂时无法分享
+* 可以通过手机端查找日志获取refresh_token
+
+> /sdcard/Android/data/com.alicloud.databox/files/logs/trace/userId/yunpan/latest.log
+
 ## 配置refresh_token
 
-> echo "refresh_token: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
+```shell
+$ echo "refresh_token: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
+```
 
 # 功能
 
@@ -21,6 +30,7 @@
 |tree (show,t)       |查看文件树                      |
 |upload (u)          |上传文件/文件夹                  |
 |share (s)           |分享文件                        |
+|mkdir (m)           |创建文件夹                      |
 
 # 使用指南
 
