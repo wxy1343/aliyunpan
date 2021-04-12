@@ -1,7 +1,7 @@
 import math
-import os
 import sys
 import time
+from pathlib import Path
 
 import requests
 
@@ -20,7 +20,8 @@ class Commander:
         self._req = Req()
         self.refresh_token = ''
 
-    def disk_init(self, refresh_token):
+    def init(self, refresh_token, depth):
+        self._path_list.depth = depth
         if len(refresh_token) == 32:
             self._disk.refresh_token = refresh_token
         else:
@@ -37,67 +38,111 @@ class Commander:
             else:
                 print(i.name, end='\t')
 
-    def tree(self, path):
-        self._path_list.tree(path)
+    def tree(self, path='root'):
+        return self._path_list.tree(path)
 
-    def rm(self, path):
-        self._disk.delete_file(self._path_list.get_path_fid(path))
+    def rm(self, path, update=False):
+        file_id = self._path_list.get_path_fid(path)
+        _ = self._disk.delete_file(file_id)
+        if _ and file_id and update:
+            self._path_list._tree.remove_node(file_id)
+        return _
 
-    def mv(self, path, parent_path):
-        self._disk.move_file(self._path_list.get_path_fid(path), self._path_list.get_path_fid(parent_path))
+    def mv(self, path, target_path, update=False):
+        file_id = self._path_list.get_path_fid(path)
+        _ = self._disk.move_file(self._path_list.get_path_fid(path), target_path)
+        if update:
+            if _ and file_id:
+                self._path_list._tree.remove_node(file_id)
+            self._path_list.update_path_list(target_path, is_fid=False)
+        return _
 
-    def upload(self, upload_path, path_list, timeout, retry, force):
+    def mkdir(self, path, update=False):
+        path = Path(path)
+        file_id = self._path_list.get_path_fid(path)
+        if file_id:
+            return True
+        parent_file_id = self._path_list.get_path_fid(path.parent)
+        r = self._disk.create_file(path.name, parent_file_id)
+        try:
+            file_id = r.json()['file_id']
+        except KeyError:
+            logger.debug(r.json()['message'])
+            return False
+        if file_id:
+            print(f'[+][mkdir]{path}')
+            if update:
+                self._path_list.update_path_list(path.parent, is_fid=False)
+            else:
+                self._path_list._tree.create_node(tag=path.name, identifier=file_id, parent=parent_file_id)
+        return file_id
+
+    def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False):
+        if isinstance(path, str):
+            path_list = (path,)
+        else:
+            path_list = path
         for path in path_list:
             if path:
-                if os.path.isfile(path):
+                path = Path(path)
+                if path.is_file():
                     self._disk.upload_file(self._path_list.get_path_fid(upload_path), path, timeout, retry, force)
-                elif os.path.isdir(path):
+                elif path.is_dir():
                     if upload_path == 'root':
                         upload_path = '/'
-                    self.upload_dir(path, upload_path, timeout, retry, force)
+                    upload_path = Path(upload_path)
+                    upload_file_list = self.upload_dir(path, upload_path, timeout, retry, force)
+                    self._path_list.update_path_list(upload_path, is_fid=False)
+                    for file in upload_file_list:
+                        self._disk.upload_file(self._path_list.get_path_fid(file[0]), *file[1])
                 else:
                     raise FileNotFoundError
 
     def upload_dir(self, path, upload_path, timeout, retry, force):
-        if not self._path_list.get_path_fid(os.path.join(upload_path, os.path.split(path)[1]).replace('\\', '/')):
-            if upload_path == '/':
-                self._disk.create_file(os.path.split(path)[1], upload_path)
+        upload_path = upload_path / path.name
+        if not self._path_list.get_path_fid(upload_path):
+            self.mkdir(upload_path)
+        upload_file_list = []
+        for file in path.iterdir():
+            if file.is_dir():
+                upload_file_list.extend(self.upload_dir(file, upload_path, timeout, retry, force))
             else:
-                self._disk.create_file(os.path.split(path)[1], self._path_list.get_path_fid(upload_path))
-        upload_path = os.path.join(upload_path, os.path.split(path)[1]).replace('\\', '/')
-        for file in os.listdir(path):
-            p = os.path.join(path, file)
-            if os.path.isdir(p):
-                self.upload_dir(p, upload_path, timeout, retry, force)
-            else:
-                self._disk.upload_file(self._path_list.get_path_fid(upload_path), p, timeout, retry, force)
+                upload_file_list.append([upload_path, (file, timeout, retry, force)])
+        return upload_file_list
 
-    def download(self, path_list, save_path):
+    def download(self, path, save_path, single_file=False):
         if save_path == '':
-            save_path = os.getcwd()
+            save_path = Path().cwd()
+        save_path = Path(save_path)
+        if isinstance(path, str):
+            path_list = (path,)
+        else:
+            path_list = path
         for path in path_list:
-            if isinstance(path, str):
+            if isinstance(path, (Path, str)):
+                path = Path(path)
                 file_node = self._path_list.get_path_node(path).data
+                if file_node.type:
+                    single_file = True
             else:
-                file_node = path
-                path = file_node.name
-            path = path.replace('/', '\\')
-            p = os.path.join(save_path, path)
+                file_node, path = path, path.name
+            p = save_path / path
             if file_node.type:
-                print(f'[*][download]{os.path.join(save_path, path)}')
+                if single_file:
+                    p = save_path / p.name
+                print(f'[*][download]{p}')
                 self.download_file(p, file_node.download_url)
             else:
-                self.download(self._path_list.get_fid_list(file_node.id), p)
+                self.download(self._path_list.get_fid_list(file_node.id), save_path / p.name)
 
     def download_file(self, path, url):
         try:
-            p = os.path.split(path)[0]
-            os.makedirs(p)
-            print(f'[+][mkdir]{p}')
+            path.parent.mkdir(parents=True)
+            print(f'[+][mkdir]{path.parent}')
         except FileExistsError:
             pass
-        if os.path.exists(path):
-            temp_size = os.path.getsize(path)
+        if path.exists():
+            temp_size = path.stat().st_size
         else:
             temp_size = 0
         headers = {'Range': 'bytes=%d-' % temp_size}
@@ -114,7 +159,7 @@ class Commander:
                 mode = 'ab'
             download_info = f'\r下载中... [{"*" * 10}] %0'
             show_download_info = download_info and file_size >= 1024 * 1024
-            with open(path, mode) as f:
+            with path.open(mode) as f:
                 for chunk in r.iter_content(chunk_size=1024):
                     if show_download_info:
                         sys.stdout.write(download_info)
@@ -136,5 +181,5 @@ class Commander:
         if path:
             file = self._path_list.get_path_node(path).data
         else:
-            file = self._path_list.get_node_by_file_id(file_id).data
+            file = self._path_list._tree.get_node(file_id).data
         print(self._disk.get_download_url(file.id, expire_sec))

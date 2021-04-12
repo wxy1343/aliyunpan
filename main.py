@@ -15,7 +15,8 @@ from aliyunpan.cli.cli import Commander
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=str, help='Specify REFRESH_TOKEN.')
-def cli(config_file, refresh_token):
+@click.option('-d', '--depth', type=int, help='File recursion depth.', default=3, show_default=True)
+def cli(config_file, refresh_token, depth):
     spectify_conf_file = os.environ.get("ALIYUNPAN_CONF", "")
     config_file = list(
         filter(lambda x: os.path.isfile(x), map(lambda x: Path(x).expanduser(), [spectify_conf_file, config_file])))
@@ -26,7 +27,7 @@ def cli(config_file, refresh_token):
                 refresh_token = conf["refresh_token"]
         else:
             raise FileNotFoundError(f'Configuration file not found.')
-    commander.disk_init(refresh_token)
+    commander.init(refresh_token, depth)
 
 
 @cli.command(aliases=['l', 'list', 'dir'], help='List files.')
@@ -47,9 +48,9 @@ def rm(path):
 @cli.command(aliases=['move'], help='Move files.')
 @click.help_option('-h', '--help')
 @click.argument('path', type=click.Path())
-@click.argument('parent_path', type=click.Path())
-def mv(path, parent_path):
-    commander.mv(path, parent_path)
+@click.argument('target_path', type=click.Path())
+def mv(path, target_path):
+    commander.mv(path, target_path)
 
 
 @cli.command(aliases=['u'], help='Upload files.')
@@ -65,7 +66,14 @@ def upload(path, file, upload_path, time_out, retry, force):
         raise click.MissingParameter(param=click.get_current_context().command.params[2])
     else:
         path_list = set((*file, path))
-    commander.upload(upload_path, path_list, time_out, retry, force)
+    commander.upload(path_list, upload_path, time_out, retry, force)
+
+
+@cli.command(aliases=['m'], help='Create folder.')
+@click.help_option('-h', '--help')
+@click.argument('path', type=click.Path(), default='')
+def mkdir(path):
+    commander.mkdir(path)
 
 
 @cli.command(aliases=['d'], help='Download files.')
@@ -77,7 +85,8 @@ def download(path, file, save_path):
     if not path and not file:
         raise click.MissingParameter(param=click.get_current_context().command.params[2])
     else:
-        file_list = set((*file, path))
+        file_list = {*file, path}
+
     commander.download(file_list, save_path)
 
 

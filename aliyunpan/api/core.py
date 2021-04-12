@@ -60,12 +60,13 @@ class AliyunPan(object):
                               'url': '/recyclebin/trash'}], 'resource': 'file'}
         headers = {'Authorization': self.access_token}
         r = await self._req.post_async(url, headers=headers, json=json)
+        logger.debug(r.text)
         if r.status_code == 200:
-            return True
+            return r.json()['responses'][0]['id']
         return False
 
     @run
-    async def move_file(self, file_id: str, path_file_id: str):
+    async def move_file(self, file_id: str, target_path: str):
         """
         移动文件
         :param file_id:
@@ -74,7 +75,7 @@ class AliyunPan(object):
         """
         url = 'https://api.aliyundrive.com/v2/batch'
         json = {"requests": [{"body": {"drive_id": self.drive_id, "file_id": file_id,
-                                       "to_parent_file_id": path_file_id},
+                                       "to_parent_file_id": target_path},
                               "headers": {"Content-Type": "application/json"},
                               "id": file_id, "method": "POST", "url": "/file/move"}],
                 "resource": "file"}
@@ -114,8 +115,6 @@ class AliyunPan(object):
         :param force:
         :return:
         """
-        if parent_file_id == '' or parent_file_id == '/':
-            parent_file_id = 'root'
         j = {
             "name": file_name,
             "drive_id": self.drive_id,
@@ -155,8 +154,6 @@ class AliyunPan(object):
         :param force: 强制覆盖
         :return:
         """
-        if parent_file_id == '' or parent_file_id == '/':
-            parent_file_id = 'root'
         split_size = 5242880  # 默认5MB分片大小(不要改)
         file_size = os.path.getsize(path)
         _, file_name = os.path.split(path)
@@ -178,9 +175,10 @@ class AliyunPan(object):
         json = {"size": file_size, "part_info_list": part_info_list, "content_hash": content_hash}
         print(f'[*][upload]{path}')
         # 申请创建文件
-        r = self.create_file(file_name, parent_file_id, True, json, force)
+        r = self.create_file(file_name=file_name, parent_file_id=parent_file_id, file_type=True, json=json, force=force)
         if r.json()['rapid_upload']:
             print(f'[+][upload]{path}\t快速上传成功')
+            return r.json()['file_id']
         else:
             upload_id = r.json()['upload_id']
             file_id = r.json()['file_id']
@@ -249,8 +247,10 @@ class AliyunPan(object):
                 total_time = int(total_time * 100) / 100
                 print(
                     f'\n[+][upload]{path}\t上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{round(file_size / 1024 / 1024 / total_time)}MB/s')
+                return r.json()['file_id']
             else:
                 print(f'\n[-][upload]{path}')
+                return False
 
     def get_access_token(self) -> str:
         """
