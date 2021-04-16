@@ -47,15 +47,45 @@ $ echo "password: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
 $ python main.py -h
 ```
 
-|参数                |描述                            |
-|--------------------|------------------------------|
-|-h, --help          |查看帮助                        |
-|--version           |查看版本                        |
-|-c, --config-file   |指定配置文件                     |
-|-t                  |指定REFRESH_TOKEN              |
-|-u                  |指定账号                        |
-|-p                  |指定密码                        |
-|-d, --depth         |文件递归深度                     | 
+<details>
+    <summary>查看详情</summary>
+    <table>
+        <tbody>
+            <tr>
+                <td>参数</td>
+                <td>描述</td>
+            </tr>
+            <tr>
+                <td>-h, --help</td>
+                <td>查看帮助</td>
+            </tr>
+            <tr>
+                <td>--version</td>
+                <td>查看版本</td>
+            </tr>
+            <tr>
+                <td>-c, --config-file</td>
+                <td>指定配置文件</td>
+            </tr>
+            <tr>
+                <td>-t</td>
+                <td>指定REFRESH_TOKEN</td>
+            </tr>
+            <tr>
+                <td>-u</td>
+                <td>指定账号</td>
+            </tr>
+            <tr>
+                <td>-p</td>
+                <td>指定密码</td>
+            </tr>
+            <tr>
+                <td>-d, --depth</td>
+                <td>文件递归深度</td>
+            </tr>
+        </tbody>
+    </table>
+</details>
 
 * 查看指令参数
 
@@ -63,16 +93,58 @@ $ python main.py -h
 $ python main.py COMMAND -h
 ```
 
-|指令                |参数                 |描述                           |
-|-------------------|--------------------|------------------------------|
-|download           |-p, --file          |选择文件(多个)                   |
-|ls                 |-l                  |查看详情                        |
-|share              |-f, --file-id       |指定file_id                    |
-|share              |-t, --expire-sec    |分享过期时间(秒)，默认最大14400    |
-|upload             |-p, --file          |选择文件(多个)                   |
-|upload             |-t, --time-out      |上传超时时间(秒)                  |
-|upload             |-r, --retry         |上传失败重试次数                  |
-|upload             |-f, --force         |强制覆盖文件                     |
+<details>
+    <summary>查看详情</summary>
+    <table>
+        <tbody>
+            <tr>
+                <td>指令</td>
+                <td>参数</td>
+                <td>描述</td>
+            </tr>
+            <tr>
+                <td>download</td>
+                <td>-p, --file</td>
+                <td>选择文件(多个)</td>
+            </tr>
+            <tr>
+                <td>ls</td>
+                <td>-l</td>
+                <td>查看详情</td>
+            </tr>
+            <tr>
+                <td>share</td>
+                <td>-f, --file-id</td>
+                <td>指定file_id</td>
+            </tr>        
+            <tr>
+                <td>share</td>
+                <td>-t, --expire-sec</td>
+                <td>分享过期时间(秒)，默认最大14400</td>
+            </tr>        
+            <tr>
+                <td>upload</td>
+                <td>-p, --file</td>
+                <td>选择文件(多个)</td>
+            </tr>        
+            <tr>
+                <td>upload</td>
+                <td>-t, --time-out</td>
+                <td>上传超时时间(秒)</td>
+            </tr>        
+            <tr>
+                <td>upload</td>
+                <td>-r, --retry</td>
+                <td>上传失败重试次数</td>
+            </tr>        
+            <tr>
+                <td>upload</td>
+                <td>-f, --force</td>
+                <td>强制覆盖文件</td>
+            </tr>
+        </tbody>
+    </table>
+</details>
 
 # 致谢
 
