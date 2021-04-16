@@ -19,6 +19,13 @@
 $ echo "refresh_token: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
 ```
 
+## 配置账号(可选)
+
+```shell
+$ echo "username: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
+$ echo "password: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
+```
+
 # 功能
 
 |指令                 |描述                           |
@@ -40,8 +47,33 @@ $ echo "refresh_token: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
 $ python main.py -h
 ```
 
+|参数                |描述                            |
+|--------------------|------------------------------|
+|-h, --help          |查看帮助                        |
+|--version           |查看版本                        |
+|-c, --config-file   |指定配置文件                     |
+|-t                  |指定REFRESH_TOKEN              |
+|-u                  |指定账号                        |
+|-p                  |指定密码                        |
+|-d, --depth         |文件递归深度                     | 
+
 * 查看指令参数
 
 ```shell
 $ python main.py COMMAND -h
 ```
+
+|指令                |参数                 |描述                           |
+|-------------------|--------------------|------------------------------|
+|download           |-p, --file          |选择文件(多个)                   |
+|ls                 |-l                  |查看详情                        |
+|share              |-f, --file-id       |指定file_id                    |
+|share              |-t, --expire-sec    |分享过期时间(秒)，默认最大14400    |
+|upload             |-p, --file          |选择文件(多个)                   |
+|upload             |-t, --time-out      |上传超时时间(秒)                  |
+|upload             |-r, --retry         |上传失败重试次数                  |
+|upload             |-f, --force         |强制覆盖文件                     |
+
+# 致谢
+
+感谢 [zhjc1124/aliyundrive](https://github.com/zhjc1124/aliyundrive) 的登录接口参考

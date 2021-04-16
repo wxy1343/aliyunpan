@@ -1,13 +1,11 @@
-import asyncio
 import hashlib
 import math
 import os
 import sys
 import time
 
-import nest_asyncio
+import func_timeout
 import requests
-from aiofile import async_open
 
 from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
@@ -15,15 +13,14 @@ from aliyunpan.api.utils import *
 
 __all__ = ['AliyunPan']
 
-nest_asyncio.apply()
-
 
 class AliyunPan(object):
 
     def __init__(self, refresh_token: str = None):
         self._req = Req()
-        self._loop = asyncio.get_event_loop()
         self._user_info = None
+        self._access_token = None
+        self._drive_id = None
         self._refresh_token = refresh_token
         self._access_token_gen = self.get_access_token()
         self._drive_id_gen = self.get_drive_id()
@@ -33,8 +30,36 @@ class AliyunPan(object):
     access_token = property(lambda self: next(self._access_token_gen))
     drive_id = property(lambda self: next(self._drive_id_gen))
 
-    @run
-    async def get_file_list(self, parent_file_id: str = 'root') -> dict:
+    def login(self, username: str, password: str):
+        """
+        登录api
+        https://github.com/zhjc1124/aliyundrive
+        :param username:
+        :param password:
+        :return:
+        """
+        password2 = encrypt(password)
+        LOGIN = {
+            'method': 'POST',
+            'url': 'https://passport.aliyundrive.com/newlogin/login.do',
+            'data': {
+                'loginId': username,
+                'password2': password2,
+                'appName': 'aliyun_drive',
+            }
+        }
+        logger.info('Logging in.')
+        r = self._req.req(**LOGIN)
+        if 'bizExt' in r.json()['content']['data']:
+            data = parse_biz_ext(r.json()['content']['data']['bizExt'])
+            logger.debug(data)
+            self._access_token = data['pds_login_result']['accessToken']
+            self._refresh_token = data['pds_login_result']['refreshToken']
+            self._drive_id = data['pds_login_result']['defaultDriveId']
+            return self._refresh_token
+        return False
+
+    def get_file_list(self, parent_file_id: str = 'root') -> dict:
         """
         获取文件列表
         :param parent_file_id:
@@ -43,11 +68,12 @@ class AliyunPan(object):
         url = 'https://api.aliyundrive.com/v2/file/list'
         json = {"drive_id": self.drive_id, "parent_file_id": parent_file_id}
         headers = {'Authorization': self.access_token}
-        r = await self._req.post_async(url, headers=headers, json=json)
+        logger.info(f'Get the list of parent_file_id {parent_file_id}.')
+        r = self._req.post(url, headers=headers, json=json)
+        logger.debug(r.status_code)
         return r.json()
 
-    @run
-    async def delete_file(self, file_id: str):
+    def delete_file(self, file_id: str):
         """
         删除文件
         :param file_id:
@@ -59,40 +85,43 @@ class AliyunPan(object):
                               'id': file_id, 'method': 'POST',
                               'url': '/recyclebin/trash'}], 'resource': 'file'}
         headers = {'Authorization': self.access_token}
-        r = await self._req.post_async(url, headers=headers, json=json)
+        logger.info(f'Delete file {file_id}.')
+        r = self._req.post(url, headers=headers, json=json)
         logger.debug(r.text)
         if r.status_code == 200:
             return r.json()['responses'][0]['id']
         return False
 
-    @run
-    async def move_file(self, file_id: str, target_path: str):
+    def move_file(self, file_id: str, parent_file_id: str):
         """
         移动文件
         :param file_id:
-        :param path_file_id:
+        :param parent_file_id:
         :return:
         """
         url = 'https://api.aliyundrive.com/v2/batch'
         json = {"requests": [{"body": {"drive_id": self.drive_id, "file_id": file_id,
-                                       "to_parent_file_id": target_path},
+                                       "to_parent_file_id": parent_file_id},
                               "headers": {"Content-Type": "application/json"},
                               "id": file_id, "method": "POST", "url": "/file/move"}],
                 "resource": "file"}
         headers = {'Authorization': self.access_token}
-        r = await self._req.post_async(url, headers=headers, json=json)
+        logger.info(f'Move files {file_id} to {parent_file_id}')
+        r = self._req.post(url, headers=headers, json=json)
+        logger.debug(r.status_code)
         if r.status_code == 200:
             return True
         return False
 
-    async def get_user_info(self) -> UserInfo:
+    def get_user_info(self) -> UserInfo:
         """
         获取用户信息
         :return:
         """
         url = 'https://api.aliyundrive.com/v2/user/get'
         headers = {'Authorization': self.access_token}
-        r = await self._req.post_async(url, headers=headers, json={})
+        logger.info('Get user information.')
+        r = self._req.post(url, headers=headers, json={})
         user_info = r.json()
         id_ = user_info['user_id']
         nick_name = user_info['nick_name']
@@ -103,9 +132,8 @@ class AliyunPan(object):
         logger.debug(user_info)
         return user_info
 
-    @run
-    async def create_file(self, file_name: str, parent_file_id: str = 'root', file_type: bool = False,
-                          json: dict = None, force: bool = False):
+    def create_file(self, file_name: str, parent_file_id: str = 'root', file_type: bool = False,
+                    json: dict = None, force: bool = False):
         """
         创建文件
         :param file_name:
@@ -135,16 +163,16 @@ class AliyunPan(object):
         # 申请创建文件
         url = 'https://api.aliyundrive.com/v2/file/create'
         headers = {'Authorization': self.access_token}
-        r = await self._req.post_async(url, headers=headers, json=j)
+        logger.info(f'Create file {file_name} in file {parent_file_id}.')
+        r = self._req.post(url, headers=headers, json=j)
         logger.debug(j)
         if force and 'exist' in r.json():
             self.delete_file(r.json()['file_id'])
             return self.create_file(file_name, parent_file_id, file_type, json)
         return r
 
-    @run
-    async def upload_file(self, parent_file_id: str = 'root', path: str = None, upload_timeout: float = 10,
-                          retry_num: int = 3, force: bool = False):
+    def upload_file(self, parent_file_id: str = 'root', path: str = None, upload_timeout: float = 10,
+                    retry_num: int = 3, force: bool = False):
         """
         上传文件
         :param retry_num:
@@ -158,16 +186,18 @@ class AliyunPan(object):
         file_size = os.path.getsize(path)
         _, file_name = os.path.split(path)
         # 获取sha1
-        async with async_open(path, 'rb') as f:
+        logger.info(f'Calculate sha1 of file {path}.')
+        with open(path, 'rb') as f:
             sha1 = hashlib.sha1()
             count = 0
             while True:
-                chunk = await f.read(split_size)
+                chunk = f.read(split_size)
                 if not chunk:
                     break
                 count += 1
                 sha1.update(chunk)
             content_hash = sha1.hexdigest()
+        logger.info(f'The SHA1 of file {path} is {content_hash}.')
         # 分片列表
         part_info_list = []
         for i in range(count):
@@ -188,50 +218,56 @@ class AliyunPan(object):
             count_size = 0
             k = 0
             upload_info = f'\r上传中... [{"*" * 10}] %0'
+            show_upload_info = upload_info and file_size >= 1024 * 1024
             for i in part_info_list:
                 part_number, upload_url = i['part_number'], i['upload_url']
-                async with async_open(path, 'rb') as f:
+                with open(path, 'rb') as f:
                     f.seek((part_number - 1) * split_size)
-                    chunk = await f.read(split_size)
+                    chunk = f.read(split_size)
                 if not chunk:
                     break
                 size = len(chunk)
                 retry_count = 0
                 start_time = time.time()
                 while True:
-                    if upload_info:
+                    if show_upload_info:
                         sys.stdout.write(upload_info)
+                        sys.stdout.flush()
                     try:
                         # 开始上传
-                        r = await self._req.put_async(upload_url, data=chunk, async_timeout=upload_timeout)
+                        r = func_timeout.func_timeout(upload_timeout,
+                                                      lambda: self._req.put(upload_url, data=chunk))
                         logger.debug(i)
                         break
                     except requests.exceptions.RequestException:
                         exc_type, exc_value, exc_traceback = sys.exc_info()
-                        sys.stdout.write(f'\rError:{exc_type.__name__}')
-                        await asyncio.sleep(1)
-                    except asyncio.exceptions.TimeoutError:
+                        sys.stdout.write(f'\rError:{exc_type.__name__}'.ljust(30))
+                        sys.stdout.flush()
+                        time.sleep(1)
+                    except func_timeout.exceptions.FunctionTimedOut:
                         if retry_count is retry_num:
-                            sys.stdout.write(f'\rError:上传超时{retry_num}次，即将重新上传')
-                            await asyncio.sleep(1)
+                            sys.stdout.write(f'\rError:上传超时{retry_num}次，即将重新上传'.ljust(30))
+                            sys.stdout.flush()
+                            time.sleep(1)
                             return self.upload_file(parent_file_id, path, upload_timeout)
-                        sys.stdout.write(f'\rError:上传超时')
+                        sys.stdout.write(f'\rError:上传超时'.ljust(30))
+                        sys.stdout.flush()
                         retry_count += 1
-                        await asyncio.sleep(1)
+                        time.sleep(1)
                     # 重试等待时间
                     n = 3
                     while n:
-                        sys.stdout.write(f'\r{n}秒后重试')
+                        sys.stdout.write(f'\r{n}秒后重试'.ljust(30))
+                        sys.stdout.flush()
                         n -= 1
-                        await asyncio.sleep(1)
+                        time.sleep(1)
                     sys.stdout.write('\r')
                 end_time = time.time()
                 t = end_time - start_time
                 total_time += t
                 k += size / file_size
                 count_size += size
-                upload_info = f'\r上传中{"." * (part_number % 4)} [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10} {round(count_size / 1024 / 1024 / total_time, 2)}MB/s'
-                sys.stdout.write(upload_info)
+                upload_info = f'\r上传中{"." * (part_number % 4)} [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10} {round(count_size / 1024 / 1024 / total_time, 2)}MB/s\t'
             # 上传完成保存文件
             url = 'https://api.aliyundrive.com/v2/file/complete'
             json = {
@@ -242,14 +278,16 @@ class AliyunPan(object):
                 "part_info_list": part_info_list_new
             }
             headers = {'Authorization': self.access_token}
-            r = await self._req.post_async(url, headers=headers, json=json)
+            r = self._req.post(url, headers=headers, json=json)
             if r.status_code == 200:
                 total_time = int(total_time * 100) / 100
-                print(
-                    f'\n[+][upload]{path}\t上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{round(file_size / 1024 / 1024 / total_time)}MB/s')
+                sys.stdout.write(
+                    f'\r[+][upload]{path}\t上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{round(file_size / 1024 / 1024 / total_time)}MB/s')
+                sys.stdout.flush()
                 return r.json()['file_id']
             else:
-                print(f'\n[-][upload]{path}')
+                sys.stdout.write(f'\r[-][upload]{path}')
+                sys.stdout.flush()
                 return False
 
     def get_access_token(self) -> str:
@@ -258,16 +296,24 @@ class AliyunPan(object):
         :return:
         """
         access_token = None
-        # url = 'https://websv.aliyundrive.com/token/refresh'
-        # json = {"refresh_token": self.refresh_token}
-        url = 'https://auth.aliyundrive.com/v2/account/token'
-        json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
         while True:
-            if access_token:
+            if self._access_token:
+                yield self._access_token
+            elif access_token:
                 yield access_token
             else:
+                # url = 'https://websv.aliyundrive.com/token/refresh'
+                # json = {"refresh_token": self.refresh_token}
+                url = 'https://auth.aliyundrive.com/v2/account/token'
+                json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
+                logger.info(f'Get ACCESS_TOKEN.')
                 r = self._req.post(url, json=json)
-                access_token = r.json()['access_token']
+                logger.debug(r.status_code)
+                try:
+                    access_token = r.json()['access_token']
+                except access_token:
+                    raise Exception('Is not a valid refresh_token')
+                logger.debug(access_token)
 
     def get_drive_id(self) -> str:
         """
@@ -276,12 +322,14 @@ class AliyunPan(object):
         """
         drive_id = None
         while True:
-            if drive_id:
+            if self._drive_id:
+                yield self._drive_id
+            elif drive_id:
                 yield drive_id
             else:
-                drive_id = self._loop.run_until_complete(self.get_user_info()).drive_id
+                drive_id = self.get_user_info().drive_id
 
-    def get_download_url(self, file_id, expire_sec=14400):
+    def get_download_url(self, file_id, expire_sec=14400) -> str:
         """
         获取分享链接
         :param file_id:
@@ -291,5 +339,9 @@ class AliyunPan(object):
         url = 'https://api.aliyundrive.com/v2/file/get_download_url'
         headers = {'Authorization': self.access_token}
         json = {'drive_id': self.drive_id, 'file_id': file_id, 'expire_sec': expire_sec}
+        logger.info(f'Get file {file_id} download link, expiration time {expire_sec} seconds.')
         r = self._req.post(url, json=json, headers=headers)
-        return r.json()['url']
+        logger.debug(r.status_code)
+        url = r.json()['url']
+        logger.debug(f'file_id:{file_id},expire_sec:{expire_sec},url:{url}')
+        return url

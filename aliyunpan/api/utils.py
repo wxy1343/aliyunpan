@@ -1,10 +1,13 @@
-import asyncio
-import functools
+import base64
 import hashlib
+import json
 import logging
 import os
 
-__all__ = ['ROOT_DIR', 'logger', 'async_run_sync', 'run', 'StrOfSize']
+__all__ = ['ROOT_DIR', 'logger', 'StrOfSize', 'encrypt', 'parse_biz_ext']
+
+import rsa
+
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(ROOT_DIR))
 LOG_LEVEL = logging.INFO
@@ -34,23 +37,6 @@ def get_sha1(path, split_size):
     return content_hash
 
 
-async def async_run_sync(fun, async_timeout):
-    loop = asyncio.get_event_loop()
-    return await asyncio.wait_for(loop.run_in_executor(None, fun), async_timeout)
-
-
-def run(f):
-    @functools.wraps(f)
-    def decorated(*args, **kwargs):
-        if 'async_run' in kwargs and kwargs['async_run']:
-            kwargs.pop('async_run')
-            return f(*args, **kwargs)
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(f(*args, **kwargs))
-
-    return decorated
-
-
 def StrOfSize(size):
     def strofsize(integer, remainder, level):
         if integer >= 1024:
@@ -66,3 +52,31 @@ def StrOfSize(size):
     if level + 1 > len(units):
         level = -1
     return ('{}.{:>03d}{}'.format(integer, remainder, units[level]))
+
+
+# RSA encrypt
+PUBLIC_KEY = b'-----BEGIN PUBLIC KEY-----\n' \
+             b'MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDTvO8fAEJPMmHIkyP6jN+hK7rE\n' \
+             b'ANn+i7Yn6NJ6RL1dWdzlWRNdZ4qBQ761uNcFbE4ficTh8VJHBiW3tBlEqX8C2m9g\n' \
+             b'WkmpPsbrnLry56wrJqNUzmnrJllT0sKeOV1tjBzbaIl4VRqg91IfKQA1+tOBF42g\n' \
+             b'vqj55q3OOQIPUTEz+wIDAQAB\n' \
+             b'-----END PUBLIC KEY-----'
+
+
+def encrypt(password):
+    MAP = "0123456789abcdefghijklmnopqrstuvwxyz"
+    rsa_result = rsa.encrypt(
+        password.encode(),
+        rsa.PublicKey.load_pkcs1_openssl_pem(PUBLIC_KEY)
+    )
+    ans = ''
+    for byte in rsa_result:
+        ans += MAP[byte >> 4]
+        ans += MAP[byte & 0x0F]
+    return ans
+
+
+def parse_biz_ext(biz_ext):
+    biz_ext = base64.b64decode(biz_ext).decode('gbk')
+    logger.debug(biz_ext)
+    return json.loads(biz_ext)

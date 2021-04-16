@@ -1,4 +1,5 @@
 import math
+import os
 import sys
 import time
 from pathlib import Path
@@ -9,6 +10,7 @@ from aliyunpan.api.core import AliyunPan
 from aliyunpan.api.models import PathList
 from aliyunpan.api.req import *
 from aliyunpan.api.utils import *
+from aliyunpan.cli.config import Config
 
 __all__ = ['Commander']
 
@@ -18,14 +20,36 @@ class Commander:
         self._disk = AliyunPan()
         self._path_list = PathList(self._disk)
         self._req = Req()
-        self.refresh_token = ''
+        self._config = Config()
 
-    def init(self, refresh_token, depth):
+    def init(self, config_file='', refresh_token=None, username=None, password=None, depth=3):
         self._path_list.depth = depth
-        if len(refresh_token) == 32:
+        spectify_conf_file = os.environ.get("ALIYUNPAN_CONF", "")
+        config_file = list(
+            filter(lambda x: Path(x).is_file(), map(lambda x: Path(x).expanduser(), [spectify_conf_file, config_file])))
+        if refresh_token:
+            if not len(refresh_token) == 32:
+                raise Exception('Is not a valid refresh_token')
             self._disk.refresh_token = refresh_token
-        else:
-            raise Exception('Is not a valid refresh_token')
+        elif username:
+            if not password:
+                raise Exception('Password not found.')
+            self._disk.login(username, password)
+        elif config_file:
+            self._config.config_file = config_file[0]
+            refresh_token = self._config.get('refresh_token')
+            username = self._config.get('username')
+            password = self._config.get('password')
+            if refresh_token:
+                if not len(refresh_token) == 32:
+                    raise Exception('Is not a valid refresh_token')
+                self._disk.refresh_token = refresh_token
+            elif username:
+                if not password:
+                    raise Exception('Password not found.')
+                self._disk.login(username, password)
+            else:
+                raise Exception('Configuration file error.')
 
     def ls(self, path, l):
         self._path_list.get_path_list(path)
@@ -50,7 +74,7 @@ class Commander:
 
     def mv(self, path, target_path, update=False):
         file_id = self._path_list.get_path_fid(path)
-        _ = self._disk.move_file(self._path_list.get_path_fid(path), target_path)
+        _ = self._disk.move_file(self._path_list.get_path_fid(path), self._path_list.get_path_fid(target_path))
         if update:
             if _ and file_id:
                 self._path_list._tree.remove_node(file_id)
@@ -121,7 +145,10 @@ class Commander:
         for path in path_list:
             if isinstance(path, (Path, str)):
                 path = Path(path)
-                file_node = self._path_list.get_path_node(path).data
+                node = self._path_list.get_path_node(path)
+                if not node:
+                    raise FileNotFoundError(path)
+                file_node = node.data
                 if file_node.type:
                     single_file = True
             else:
@@ -155,6 +182,7 @@ class Commander:
                 return True
             elif temp_size > file_size:
                 mode = 'wb'
+                temp_size = 0
             else:
                 mode = 'ab'
             download_info = f'\r下载中... [{"*" * 10}] %0'
@@ -165,7 +193,7 @@ class Commander:
                         sys.stdout.write(download_info)
                     if chunk:
                         temp_size += len(chunk)
-                        f.write(chunk)
+                        f._write(chunk)
                     total_time = time.time() - start_time
                     k = temp_size / file_size
                     download_info = f'\r下载中... [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10} {round(temp_size / total_time / 1024 / 1024, 2)}MB/s'

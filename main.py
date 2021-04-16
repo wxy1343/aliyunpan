@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-import os
-from pathlib import Path
-
 import click
-import yaml
 from click_aliases import ClickAliasedGroup
 
 from aliyunpan.cli.cli import Commander
@@ -11,23 +7,22 @@ from aliyunpan.cli.cli import Commander
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='1.0.2')
+@click.version_option(version='1.1.0')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=str, help='Specify REFRESH_TOKEN.')
+@click.option('-u', 'username', type=str, help='Specify USERNAME.')
+@click.option('-p', 'password', type=str, help='Specify PASSWORD.')
 @click.option('-d', '--depth', type=int, help='File recursion depth.', default=3, show_default=True)
-def cli(config_file, refresh_token, depth):
-    spectify_conf_file = os.environ.get("ALIYUNPAN_CONF", "")
-    config_file = list(
-        filter(lambda x: os.path.isfile(x), map(lambda x: Path(x).expanduser(), [spectify_conf_file, config_file])))
-    if not refresh_token:
-        if config_file:
-            with open(config_file[0]) as f:
-                conf = yaml.safe_load(f)
-                refresh_token = conf["refresh_token"]
-        else:
-            raise FileNotFoundError(f'Configuration file not found.')
-    commander.init(refresh_token, depth)
+def cli(config_file, refresh_token, username, password, depth):
+    if refresh_token:
+        commander.init(refresh_token=refresh_token, depth=depth)
+    elif username:
+        commander.init(username=username, password=password, depth=depth)
+    elif config_file:
+        commander.init(config_file=config_file, depth=depth)
+    else:
+        raise FileNotFoundError(f'Configuration file not found.')
 
 
 @cli.command(aliases=['l', 'list', 'dir'], help='List files.')
