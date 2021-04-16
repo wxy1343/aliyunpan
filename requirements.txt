@@ -1,7 +1,7 @@
-requests==2.22.0
 treelib==1.6.1
-nest_asyncio==1.5.1
-aiofile==3.5.0
+func_timeout==4.3.5
+requests==2.22.0
 click_aliases==1.0.1
+rsa==4.0
 click==7.1.1
-pyyaml
+ruamel.base==1.0.0
