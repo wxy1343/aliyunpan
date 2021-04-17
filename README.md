@@ -9,7 +9,8 @@
 ## 注意
 
 * web端获取的refresh_token暂时无法分享
-* 可以通过手机端查找日志获取refresh_token
+1. 可以指定账号密码登入
+2. 可以通过手机端查找日志获取refresh_token
 
 > /sdcard/Android/data/com.alicloud.databox/files/logs/trace/userId/yunpan/latest.log
 
@@ -23,7 +24,7 @@ $ echo "refresh_token: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
 
 ```shell
 $ echo "username: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
-$ echo "password: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
+$ echo "password: 'xxxxx'"  >>  ~/.config/aliyunpan.yaml
 ```
 
 # 功能
