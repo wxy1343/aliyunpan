@@ -193,7 +193,7 @@ class Commander:
                         sys.stdout.write(download_info)
                     if chunk:
                         temp_size += len(chunk)
-                        f._write(chunk)
+                        f.write(chunk)
                     total_time = time.time() - start_time
                     k = temp_size / file_size
                     download_info = f'\r下载中... [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10} {round(temp_size / total_time / 1024 / 1024, 2)}MB/s'
