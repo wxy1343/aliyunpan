@@ -1,33 +1,38 @@
 # aliyunpan
 
-阿里云盘cli
+---
 
-# 获取refresh_token
+阿里云盘cli  
+环境要求： python 3.7 通过测试  
+低版本环境运行报错参考[issue9](https://github.com/wxy1343/aliyunpan/issues/9)
+
+## 获取refresh_token
 
 ![token](https://github.com/wxy1343/aliyunpan/raw/main/token.png)
 
-## 注意
+### 注意
 
 * web端获取的refresh_token暂时无法分享
+
 1. 可以指定账号密码登入
 2. 可以通过手机端查找日志获取refresh_token
 
 > /sdcard/Android/data/com.alicloud.databox/files/logs/trace/userId/yunpan/latest.log
 
-## 配置refresh_token
+### 配置refresh_token
 
 ```shell
-$ echo "refresh_token: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
+echo "refresh_token: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
 ```
 
-## 配置账号(可选)
+### 配置账号(可选)
 
 ```shell
-$ echo "username: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
-$ echo "password: 'xxxxx'"  >>  ~/.config/aliyunpan.yaml
+echo "username: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
+echo "password: 'xxxxx'"  >>  ~/.config/aliyunpan.yaml
 ```
 
-# 功能
+## 功能介绍
 
 |指令                 |描述                           |
 |--------------------|------------------------------|
@@ -40,12 +45,12 @@ $ echo "password: 'xxxxx'"  >>  ~/.config/aliyunpan.yaml
 |share (s)           |分享文件                        |
 |mkdir (m)           |创建文件夹                      |
 
-# 使用指南
+## 使用指南
 
 * 查看帮助
 
 ```shell
-$ python main.py -h
+python main.py -h
 ```
 
 <details>
@@ -91,7 +96,7 @@ $ python main.py -h
 * 查看指令参数
 
 ```shell
-$ python main.py COMMAND -h
+python main.py COMMAND -h
 ```
 
 <details>
@@ -147,6 +152,6 @@ $ python main.py COMMAND -h
     </table>
 </details>
 
-# 致谢
+## 致谢
 
 感谢 [zhjc1124/aliyundrive](https://github.com/zhjc1124/aliyundrive) 的登录接口参考
