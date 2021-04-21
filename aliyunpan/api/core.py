@@ -311,7 +311,7 @@ class AliyunPan(object):
                 logger.debug(r.status_code)
                 try:
                     access_token = r.json()['access_token']
-                except access_token:
+                except KeyError:
                     raise Exception('Is not a valid refresh_token')
                 logger.debug(access_token)
 
