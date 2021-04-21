@@ -206,7 +206,12 @@ class AliyunPan(object):
         print(f'[*][upload]{path}')
         # 申请创建文件
         r = self.create_file(file_name=file_name, parent_file_id=parent_file_id, file_type=True, json=json, force=force)
-        if r.json()['rapid_upload']:
+        if 'rapid_upload' not in r.json():
+            message = r.json()['message']
+            logger.error(message)
+            raise Exception(message)
+        rapid_upload = r.json()['rapid_upload']
+        if rapid_upload:
             print(f'[+][upload]{path}\t快速上传成功')
             return r.json()['file_id']
         else:
