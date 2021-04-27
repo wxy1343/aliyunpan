@@ -1,11 +1,9 @@
-import hashlib
 import math
 import os
 import sys
 import time
 
 import func_timeout
-import requests
 
 from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
@@ -186,20 +184,10 @@ class AliyunPan(object):
         file_size = os.path.getsize(path)
         _, file_name = os.path.split(path)
         # 获取sha1
-        logger.info(f'Calculate sha1 of file {path}.')
-        with open(path, 'rb') as f:
-            sha1 = hashlib.sha1()
-            count = 0
-            while True:
-                chunk = f.read(split_size)
-                if not chunk:
-                    break
-                count += 1
-                sha1.update(chunk)
-            content_hash = sha1.hexdigest()
-        logger.info(f'The SHA1 of file {path} is {content_hash}.')
+        content_hash = get_sha1(path, split_size)
         # 分片列表
         part_info_list = []
+        count = int(file_size / split_size) + 1
         for i in range(count):
             part_info_list.append({"part_number": i + 1})
         json = {"size": file_size, "part_info_list": part_info_list, "content_hash": content_hash}
@@ -244,12 +232,8 @@ class AliyunPan(object):
                                                       lambda: self._req.put(upload_url, data=chunk))
                         logger.debug(i)
                         break
-                    except requests.exceptions.RequestException:
-                        exc_type, exc_value, exc_traceback = sys.exc_info()
-                        sys.stdout.write(f'\rError:{exc_type.__name__}'.ljust(30))
-                        sys.stdout.flush()
-                        time.sleep(1)
                     except func_timeout.exceptions.FunctionTimedOut:
+                        logger.warn('Upload timeout.')
                         if retry_count is retry_num:
                             sys.stdout.write(f'\rError:上传超时{retry_num}次，即将重新上传'.ljust(30))
                             sys.stdout.flush()
@@ -258,6 +242,14 @@ class AliyunPan(object):
                         sys.stdout.write(f'\rError:上传超时'.ljust(30))
                         sys.stdout.flush()
                         retry_count += 1
+                        time.sleep(1)
+                    except KeyboardInterrupt:
+                        raise KeyboardInterrupt
+                    except:
+                        logger.error(sys.exc_info())
+                        exc_type, exc_value, exc_traceback = sys.exc_info()
+                        sys.stdout.write(f'\rError:{exc_type.__name__}'.ljust(30))
+                        sys.stdout.flush()
                         time.sleep(1)
                     # 重试等待时间
                     n = 3
