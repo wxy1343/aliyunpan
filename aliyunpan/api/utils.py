@@ -4,7 +4,7 @@ import json
 import logging
 import os
 
-__all__ = ['ROOT_DIR', 'logger', 'StrOfSize', 'encrypt', 'parse_biz_ext']
+__all__ = ['ROOT_DIR', 'logger', 'get_sha1', 'StrOfSize', 'encrypt', 'parse_biz_ext']
 
 import rsa
 
@@ -24,6 +24,7 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
 def get_sha1(path, split_size):
+    logger.info(f'Calculate sha1 of file {path}.')
     with open(path, 'rb') as f:
         sha1 = hashlib.sha1()
         count = 0
@@ -34,6 +35,7 @@ def get_sha1(path, split_size):
             count += 1
             sha1.update(chunk)
         content_hash = sha1.hexdigest()
+    logger.info(f'The SHA1 of file {path} is {content_hash}.')
     return content_hash
 
 
