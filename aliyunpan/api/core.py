@@ -25,8 +25,10 @@ class AliyunPan(object):
 
     refresh_token = property(lambda self: self._refresh_token,
                              lambda self, value: setattr(self, '_refresh_token', value))
-    access_token = property(lambda self: next(self._access_token_gen_))
-    drive_id = property(lambda self: next(self._drive_id_gen_))
+    access_token = property(lambda self: next(self._access_token_gen_),
+                            lambda self, value: setattr(self, '_access_token', value))
+    drive_id = property(lambda self: next(self._drive_id_gen_),
+                        lambda self, value: setattr(self, '_drive_id', value))
 
     def login(self, username: str, password: str):
         """
