@@ -20,13 +20,13 @@ class AliyunPan(object):
         self._access_token = None
         self._drive_id = None
         self._refresh_token = refresh_token
-        self._access_token_gen = self.get_access_token()
-        self._drive_id_gen = self.get_drive_id()
+        self._access_token_gen_ = self._access_token_gen()
+        self._drive_id_gen_ = self._drive_id_gen()
 
     refresh_token = property(lambda self: self._refresh_token,
                              lambda self, value: setattr(self, '_refresh_token', value))
-    access_token = property(lambda self: next(self._access_token_gen))
-    drive_id = property(lambda self: next(self._drive_id_gen))
+    access_token = property(lambda self: next(self._access_token_gen_))
+    drive_id = property(lambda self: next(self._drive_id_gen_))
 
     def login(self, username: str, password: str):
         """
@@ -244,7 +244,7 @@ class AliyunPan(object):
                         retry_count += 1
                         time.sleep(1)
                     except KeyboardInterrupt:
-                        raise KeyboardInterrupt
+                        raise
                     except:
                         logger.error(sys.exc_info())
                         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -292,6 +292,25 @@ class AliyunPan(object):
         获取access_token
         :return:
         """
+        # url = 'https://websv.aliyundrive.com/token/refresh'
+        # json = {"refresh_token": self.refresh_token}
+        url = 'https://auth.aliyundrive.com/v2/account/token'
+        json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
+        logger.info(f'Get ACCESS_TOKEN.')
+        r = self._req.post(url, json=json)
+        logger.debug(r.status_code)
+        try:
+            access_token = r.json()['access_token']
+        except KeyError:
+            raise Exception('Is not a valid refresh_token')
+        logger.debug(access_token)
+        return access_token
+
+    def _access_token_gen(self) -> str:
+        """
+        access_token生成器
+        :return:
+        """
         access_token = None
         while True:
             if self._access_token:
@@ -299,22 +318,18 @@ class AliyunPan(object):
             elif access_token:
                 yield access_token
             else:
-                # url = 'https://websv.aliyundrive.com/token/refresh'
-                # json = {"refresh_token": self.refresh_token}
-                url = 'https://auth.aliyundrive.com/v2/account/token'
-                json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
-                logger.info(f'Get ACCESS_TOKEN.')
-                r = self._req.post(url, json=json)
-                logger.debug(r.status_code)
-                try:
-                    access_token = r.json()['access_token']
-                except KeyError:
-                    raise Exception('Is not a valid refresh_token')
-                logger.debug(access_token)
+                access_token = self.get_access_token()
 
     def get_drive_id(self) -> str:
         """
         获取drive_id
+        :return:
+        """
+        return self.get_user_info().drive_id
+
+    def _drive_id_gen(self) -> str:
+        """
+        drive_id生成器
         :return:
         """
         drive_id = None
@@ -324,7 +339,7 @@ class AliyunPan(object):
             elif drive_id:
                 yield drive_id
             else:
-                drive_id = self.get_user_info().drive_id
+                drive_id = self.get_drive_id()
 
     def get_download_url(self, file_id, expire_sec=14400) -> str:
         """
