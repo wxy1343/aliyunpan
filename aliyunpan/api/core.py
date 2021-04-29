@@ -4,6 +4,7 @@ import sys
 import time
 
 import func_timeout
+import requests
 
 from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
@@ -66,7 +67,7 @@ class AliyunPan(object):
         :return:
         """
         url = 'https://api.aliyundrive.com/v2/file/list'
-        json = {"drive_id": self.drive_id, "parent_file_id": parent_file_id}
+        json = {"drive_id": self.drive_id, "parent_file_id": parent_file_id, 'fields': '*'}
         headers = {'Authorization': self.access_token}
         logger.info(f'Get the list of parent_file_id {parent_file_id}.')
         r = self._req.post(url, headers=headers, json=json)
@@ -133,7 +134,7 @@ class AliyunPan(object):
         return user_info
 
     def create_file(self, file_name: str, parent_file_id: str = 'root', file_type: bool = False,
-                    json: dict = None, force: bool = False):
+                    json: dict = None, force: bool = False) -> requests.models.Response:
         """
         创建文件
         :param file_name:
@@ -359,3 +360,21 @@ class AliyunPan(object):
         url = r.json()['url']
         logger.debug(f'file_id:{file_id},expire_sec:{expire_sec},url:{url}')
         return url
+
+    def save_share_link(self, name: str, content_hash: str, size: str, parent_file_id: str = 'root',
+                        force: bool = False) -> bool:
+        """
+        保存分享文件
+        :param name:
+        :param content_hash:
+        :param size:
+        :param parent_file_id:
+        :param force:
+        :return:
+        """
+        logger.info(f'name: {name}, content_hash:{content_hash}, size:{size}')
+        json = {'content_hash': content_hash, 'size': int(size)}
+        r = self.create_file(name, parent_file_id=parent_file_id, file_type=True, json=json, force=force)
+        if r.status_code == 201 and 'rapid_upload' in r.json() and r.json()['rapid_upload']:
+            return True
+        return False

@@ -3,7 +3,9 @@ from pathlib import Path
 
 from treelib import Tree
 
-from aliyunpan.api.type import FileInfo
+from aliyunpan.api.type import FileInfo, ShareInfo
+
+_all_ = ['PathList', 'parse_share_url']
 
 
 class PathList:
@@ -26,8 +28,8 @@ class PathList:
                 file_info = FileInfo(name=i['name'], id=i['file_id'], pid=i['parent_file_id'], type=True,
                                      ctime=time.strptime(i['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
                                      update_time=time.strptime(i['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
-                                     hidden=i['hidden'],
-                                     category=i['category'], size=i['size'], content_hash_name=i['content_hash_name'],
+                                     hidden=i['hidden'], category=i['category'], content_type=i['content_type'],
+                                     size=i['size'], content_hash_name=i['content_hash_name'],
                                      content_hash=i['content_hash'], download_url=i['download_url'])
             else:
                 file_info = FileInfo(name=i['name'], id=i['file_id'], pid=i['parent_file_id'], type=False,
@@ -66,13 +68,18 @@ class PathList:
         if str(path) in ('', '/', '\\', '.', 'root'):
             return 'root'
         flag = False
-        for i in filter(None, path.as_posix().split('/')):
+        path_list = list(filter(None, path.as_posix().split('/')))
+        if path_list[0] == 'root':
+            path_list = path_list[1:]
+        for i in path_list:
             flag = False
             for j in self._tree.children(file_id):
                 if i == j.tag:
                     flag = True
                     file_id = j.identifier
                     break
+            if not flag:
+                return False
         if flag:
             return file_id
         return False
@@ -94,3 +101,9 @@ class PathList:
     def auto_update_path_list(self, auto_update=True):
         if auto_update and len(self._tree) == 1:
             return self.update_path_list()
+
+
+def parse_share_url(url):
+    name, content_hash, size, path = url.split('aliyunpan://')[1].split('|')[:4]
+    share_info = ShareInfo(name=name, content_hash=content_hash, size=size, path=Path(path.strip()))
+    return share_info

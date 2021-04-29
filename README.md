@@ -129,6 +129,21 @@ python main.py COMMAND -h
                 <td>分享过期时间(秒)，默认最大14400</td>
             </tr>        
             <tr>
+                <td>share_link</td>
+                <td>-l, --share-link</td>
+                <td>输出分享链接</td>
+            </tr>        
+            <tr>
+                <td>share</td>
+                <td>-d, --download-link</td>
+                <td>输出下载链接</td>
+            </tr>        
+            <tr>
+                <td>share</td>
+                <td>-s, --save</td>
+                <td>保存序列文件到云盘和本地</td>
+            </tr>        
+            <tr>
                 <td>upload</td>
                 <td>-p, --file</td>
                 <td>选择文件(多个)</td>
@@ -151,6 +166,44 @@ python main.py COMMAND -h
         </tbody>
     </table>
 </details>
+
+### 分享
+
+1.分享链接格式
+
+```
+aliyunpan://文件名|sha1|文件大小|相对路径
+```
+
+例如
+
+```
+aliyunpan://示例文件.txt|F61851825609372B3D7F802E600B35A497CFC38E|24|root
+```
+
+2.文件分享
+
+```shell
+python main.py share 示例文件.txt 
+```
+
+导入
+
+```shell
+python main.py upload "aliyunpan://示例文件.txt|F61851825609372B3D7F802E600B35A497CFC38E|24|root"
+```
+
+3.文件夹分享
+
+```shell
+python main.py share 示例文件夹
+```
+
+导入
+
+```shell
+python main.py upload -s "aliyunpan://示例文件夹.txt|9A962E43383C76607971C0D970E4F680A1C1BF46|704|root"
+```
 
 ## 致谢
 

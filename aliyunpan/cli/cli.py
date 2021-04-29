@@ -1,13 +1,11 @@
 import math
 import os
 import sys
-import time
-from pathlib import Path
 
 import requests
 
 from aliyunpan.api.core import AliyunPan
-from aliyunpan.api.models import PathList
+from aliyunpan.api.models import *
 from aliyunpan.api.req import *
 from aliyunpan.api.utils import *
 from aliyunpan.cli.config import Config
@@ -21,8 +19,10 @@ class Commander:
         self._path_list = PathList(self._disk)
         self._req = Req()
         self._config = Config()
+        self._share_link = 'aliyunpan://'
+        self._txt = ''
 
-    def init(self, config_file='', refresh_token=None, username=None, password=None, depth=3):
+    def init(self, config_file='~/.config/aliyunpan.yaml', refresh_token=None, username=None, password=None, depth=3):
         self._path_list.depth = depth
         spectify_conf_file = os.environ.get("ALIYUNPAN_CONF", "")
         config_file = list(
@@ -87,6 +87,8 @@ class Commander:
         if file_id:
             return True
         parent_file_id = self._path_list.get_path_fid(path.parent)
+        if not parent_file_id:
+            parent_file_id = self.mkdir(path.parent)
         r = self._disk.create_file(path.name, parent_file_id)
         try:
             file_id = r.json()['file_id']
@@ -101,16 +103,43 @@ class Commander:
                 self._path_list._tree.create_node(tag=path.name, identifier=file_id, parent=parent_file_id)
         return file_id
 
-    def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False):
+    def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False, share=False):
         if isinstance(path, str):
             path_list = (path,)
         else:
             path_list = path
+        result_list = []
         for path in path_list:
             if path:
+                if self._share_link in path:
+                    share_list = []
+                    if share:
+                        share_info = parse_share_url(path)
+                        if not self._path_list.get_path_fid(share_info.name):
+                            self.upload_share(share_info)
+                            self._path_list.update_path_list(depth=1)
+                        for line in self.cat(share_info.name).split('\n'):
+                            if line.startswith(self._share_link):
+                                share_list.append(parse_share_url(line))
+                    else:
+                        share_list = parse_share_url(path)
+                    return self.upload_share(share_list, upload_path, force)
                 path = Path(path)
                 if path.is_file():
-                    self._disk.upload_file(self._path_list.get_path_fid(upload_path), path, timeout, retry, force)
+                    if share:
+                        share_list = []
+                        with open(path, 'r', encoding='utf-8') as f:
+                            while True:
+                                line = f.readline()
+                                if not line:
+                                    break
+                                if line.startswith(self._share_link):
+                                    share_list.append(parse_share_url(line))
+                        return self.upload_share(share_list, upload_path, force)
+                    else:
+                        file_id = self._disk.upload_file(self._path_list.get_path_fid(upload_path), path, timeout,
+                                                         retry, force)
+                        result_list.append(file_id)
                 elif path.is_dir():
                     if upload_path == 'root':
                         upload_path = '/'
@@ -118,9 +147,13 @@ class Commander:
                     upload_file_list = self.upload_dir(path, upload_path, timeout, retry, force)
                     self._path_list.update_path_list(upload_path, is_fid=False)
                     for file in upload_file_list:
-                        self._disk.upload_file(self._path_list.get_path_fid(file[0]), *file[1])
+                        result = self._disk.upload_file(self._path_list.get_path_fid(file[0]), *file[1])
+                        result_list.append(result)
                 else:
                     raise FileNotFoundError
+        if len(result_list) == 1:
+            result_list = result_list[0]
+        return result_list
 
     def upload_dir(self, path, upload_path, timeout, retry, force):
         upload_path = upload_path / path.name
@@ -133,6 +166,23 @@ class Commander:
             else:
                 upload_file_list.append([upload_path, (file, timeout, retry, force)])
         return upload_file_list
+
+    def upload_share(self, share_info_list, upload_path='root', force=False):
+        if not isinstance(share_info_list, list):
+            share_info_list = [share_info_list]
+        if upload_path == 'root':
+            upload_path = ''
+        for share_info in share_info_list:
+            self.mkdir(upload_path / share_info.path)
+        for share_info in share_info_list:
+            path = share_info.path
+            if not str(upload_path) and str(path) == 'root':
+                path = Path('')
+            parent_file_id = self._path_list.get_path_fid(upload_path / path)
+            if self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.size, parent_file_id,
+                                          force):
+                print(f'[+]{upload_path / path / share_info.name} 快速上传成功')
+        return True
 
     def download(self, path, save_path, single_file=False):
         if save_path == '':
@@ -205,9 +255,54 @@ class Commander:
         print(f'[+][download]{path}')
         return True
 
-    def share(self, path, file_id, expire_sec):
-        if path:
-            file = self._path_list.get_path_node(path).data
-        else:
-            file = self._path_list._tree.get_node(file_id).data
-        print(self._disk.get_download_url(file.id, expire_sec))
+    def cat(self, path):
+        file_id = self._path_list.get_path_node(path)
+        if not file_id:
+            raise FileNotFoundError(path)
+        file = file_id.data
+        r = self._req.get(file.download_url)
+        return r.text
+
+    def share(self, path, file_id, expire_sec, share_link, download_link, save):
+        def share_(path, file_id, parent_file=''):
+            if path:
+                file_id = self._path_list.get_path_node(path)
+                if not file_id:
+                    raise FileNotFoundError(path)
+                file = file_id.data
+            else:
+                file = self._path_list._tree.get_node(file_id).data
+            if file.type:
+                share_txt = ''
+                if download_link:
+                    share_txt = file.name.center(50, '-') + '\n'
+                    share_txt += '下载链接'.center(50, '*') + '\n'
+                    url = self._disk.get_download_url(file.id, expire_sec)
+                    share_txt += url + '\n'
+                if share_link:
+                    share_txt += '分享链接'.center(50, '*') + '\n'
+                    url = f'{self._share_link}{file.name}|{file.content_hash}|{file.size}|{parent_file or "root"}'
+                    share_txt += url + '\n'
+                    share_txt += '导入链接'.center(50, '*') + '\n'
+                    share_txt += f'python main.py upload "{url}"' + '\n'
+                print(share_txt)
+                self._txt += share_txt
+            else:
+                for i in self._path_list.get_fid_list(file.id):
+                    share_(path=None, file_id=i.id, parent_file=Path(parent_file) / file.name)
+
+        share_(path, file_id)
+        if save:
+            file_name = f'{time.strftime("%Y年%m月%d日%H时%M分%S秒", time.localtime())}序列文件.txt'
+            with open(file_name, 'w', encoding='utf-8') as f:
+                f.write(self._txt)
+            print('文件导入'.center(50, '*'))
+            print(f'python main.py upload -s {file_name}')
+            print('链接导入'.center(50, '*'))
+            file_id = self.upload(file_name)
+            print()
+            if file_id:
+                self._path_list.update_path_list(depth=1)
+                file = self._path_list._tree.get_node(file_id).data
+                url = f'{self._share_link}{file.name}|{file.content_hash}|{file.size}|root'
+                print(f'python main.py upload -s "{url}"')
