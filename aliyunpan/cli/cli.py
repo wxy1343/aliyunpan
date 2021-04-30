@@ -65,12 +65,13 @@ class Commander:
     def tree(self, path='root'):
         return self._path_list.tree(path)
 
-    def rm(self, path, update=False):
+    def rm(self, path):
         file_id = self._path_list.get_path_fid(path)
-        _ = self._disk.delete_file(file_id)
-        if _ and file_id and update:
+        file_id_ = self._disk.delete_file(file_id)
+        if file_id_ == file_id:
             self._path_list._tree.remove_node(file_id)
-        return _
+            print(f'[-][rm]{path}')
+        return file_id_
 
     def mv(self, path, target_path, update=False):
         file_id = self._path_list.get_path_fid(path)
@@ -121,6 +122,7 @@ class Commander:
                         for line in self.cat(share_info.name).split('\n'):
                             if line.startswith(self._share_link):
                                 share_list.append(parse_share_url(line))
+                        self.rm(share_info.name)
                     else:
                         share_list = parse_share_url(path)
                     return self.upload_share(share_list, upload_path, force)
