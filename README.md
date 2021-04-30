@@ -202,7 +202,7 @@ python main.py share 示例文件夹
 导入
 
 ```shell
-python main.py upload -s "aliyunpan://示例文件夹.txt|9A962E43383C76607971C0D970E4F680A1C1BF46|704|root"
+python main.py upload -s "aliyunpan://示例文件夹|E682D72516A078F1018F457E7C2B994A0E2011B8|994|root"
 ```
 
 ## 致谢
