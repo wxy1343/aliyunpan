@@ -82,7 +82,7 @@ class Commander:
         return _
 
     def mkdir(self, path, update=False):
-        path = Path(path)
+        path = Path(Path(path).as_posix().replace('\\', '/'))
         file_id = self._path_list.get_path_fid(path)
         if file_id:
             return True
@@ -181,7 +181,8 @@ class Commander:
             parent_file_id = self._path_list.get_path_fid(upload_path / path)
             if self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.size, parent_file_id,
                                           force):
-                print(f'[+]{upload_path / path / share_info.name} 快速上传成功')
+                p = Path(upload_path / path / share_info.name).as_posix().replace('\\', '/')
+                print(f'[+]{p} 快速上传成功')
         return True
 
     def download(self, path, save_path, single_file=False):

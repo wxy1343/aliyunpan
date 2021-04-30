@@ -64,11 +64,11 @@ class PathList:
 
     def get_path_fid(self, path, file_id='root', auto_update=True):
         self.auto_update_path_list(auto_update)
-        path = Path(path)
+        path = Path(path).as_posix().replace('\\', '/')
         if str(path) in ('', '/', '\\', '.', 'root'):
             return 'root'
         flag = False
-        path_list = list(filter(None, path.as_posix().split('/')))
+        path_list = list(filter(None, path.split('/')))
         if path_list[0] == 'root':
             path_list = path_list[1:]
         for i in path_list:
