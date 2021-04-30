@@ -274,18 +274,17 @@ class Commander:
             else:
                 file = self._path_list._tree.get_node(file_id).data
             if file.type:
-                share_txt = ''
+                share_txt = file.name.center(50, '-') + '\n'
                 if download_link:
-                    share_txt = file.name.center(50, '-') + '\n'
                     share_txt += '下载链接'.center(50, '*') + '\n'
                     url = self._disk.get_download_url(file.id, expire_sec)
-                    share_txt += url + '\n'
+                    share_txt += url + '\n\n'
                 if share_link:
                     share_txt += '分享链接'.center(50, '*') + '\n'
                     url = f'{self._share_link}{file.name}|{file.content_hash}|{file.size}|{parent_file or "root"}'
                     share_txt += url + '\n'
                     share_txt += '导入链接'.center(50, '*') + '\n'
-                    share_txt += f'python main.py upload "{url}"' + '\n'
+                    share_txt += f'python main.py upload "{url}"' + '\n\n'
                 print(share_txt)
                 self._txt += share_txt
             else:
