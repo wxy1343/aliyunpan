@@ -116,7 +116,8 @@ class Commander:
                     share_list = []
                     if share:
                         share_info = parse_share_url(path)
-                        if not self._path_list.get_path_node(share_info.name).data.type:
+                        file = self._path_list.get_path_node(share_info.name)
+                        if file and not file.data.type:
                             path = path.replace(share_info.name, share_info.name + str(int(time.time())))
                             share_info = parse_share_url(path)
                         if not self._path_list.get_path_fid(share_info.name):
@@ -296,9 +297,12 @@ class Commander:
                 for i in self._path_list.get_fid_list(file.id):
                     share_(path=None, file_id=i.id, parent_file=Path(parent_file) / file.name)
 
+        self._txt += '*' * 50 + '\n'
+        self._txt += '项目地址: https://github.com/wxy1343/aliyunpan'.center(50, '*') + '\n'
+        self._txt += '*' * 50 + '\n\n'
         share_(path, file_id)
         if save:
-            file_name = f'{time.strftime("%Y年%m月%d日%H时%M分%S秒", time.localtime())}序列文件.txt'
+            file_name = Path(path).name + f'{int(time.time())}.txt'
             with open(file_name, 'w', encoding='utf-8') as f:
                 f.write(self._txt)
             print('文件导入'.center(50, '*'))
@@ -309,5 +313,5 @@ class Commander:
             if file_id:
                 self._path_list.update_path_list(depth=1)
                 file = self._path_list._tree.get_node(file_id).data
-                url = f'{self._share_link}{file.name}|{file.content_hash}|{file.size}|root'
+                url = f'{self._share_link}{Path(path).name}|{file.content_hash}|{file.size}|root'
                 print(f'python main.py upload -s "{url}"')
