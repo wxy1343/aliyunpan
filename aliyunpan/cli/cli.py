@@ -116,6 +116,9 @@ class Commander:
                     share_list = []
                     if share:
                         share_info = parse_share_url(path)
+                        if not self._path_list.get_path_node(share_info.name).data.type:
+                            path = path.replace(share_info.name, share_info.name + str(int(time.time())))
+                            share_info = parse_share_url(path)
                         if not self._path_list.get_path_fid(share_info.name):
                             self.upload_share(share_info)
                             self._path_list.update_path_list(depth=1)
