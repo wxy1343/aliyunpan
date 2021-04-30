@@ -298,7 +298,7 @@ class Commander:
                     share_(path=None, file_id=i.id, parent_file=Path(parent_file) / file.name)
 
         self._txt += '*' * 50 + '\n'
-        self._txt += '项目地址: https://github.com/wxy1343/aliyunpan'.center(50, '*') + '\n'
+        self._txt += '项目地址: https://github.com/wxy1343/aliyunpan' + '\n'
         self._txt += '*' * 50 + '\n\n'
         share_(path, file_id)
         if save:
