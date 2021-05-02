@@ -387,7 +387,7 @@ class AliyunPan(object):
         json = {'content_hash': content_hash, 'size': int(size), 'content_hash_name': content_hash_name or 'sha1'}
         r = self.create_file(name, parent_file_id=parent_file_id, file_type=True, json=json, force=force)
         if r.status_code == 201 and 'rapid_upload' in r.json() and r.json()['rapid_upload']:
-            return True
+            return r.json()['file_id']
         elif 'message' in r.json():
             print(r.json()["message"])
         return False
