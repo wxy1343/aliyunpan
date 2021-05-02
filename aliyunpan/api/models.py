@@ -19,11 +19,11 @@ class PathList:
         if depth is None:
             depth = self.depth
         if not is_fid:
-            file_id = self.get_path_fid(file_id, auto_update=False)
+            file_id = self.get_path_fid(file_id, update=False)
         file_list = self._disk.get_file_list(file_id)
-        if 'items' not in file_list:
+        if not file_list:
             return False
-        for i in file_list['items']:
+        for i in file_list:
             if i['type'] == 'file':
                 file_info = FileInfo(name=i['name'], id=i['file_id'], pid=i['parent_file_id'], type=True,
                                      ctime=time.strptime(i['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
@@ -44,26 +44,26 @@ class PathList:
                 self.update_path_list(file_id=file_info.id, depth=depth - 1)
         return True
 
-    def tree(self, path='root', auto_update=True):
-        file_id = self.get_path_fid(path, auto_update=auto_update)
+    def tree(self, path='root'):
+        file_id = self.get_path_fid(path, update=False)
+        self.update_path_list(file_id)
         if not file_id:
-            raise Exception('No such file or directory')
+            raise FileNotFoundError(path)
         self._tree.show(file_id)
 
-    def get_path_list(self, path, auto_update=True):
-        file_id = self.get_path_fid(path, auto_update=auto_update)
-        return self.get_fid_list(file_id, auto_update=auto_update)
+    def get_path_list(self, path, update=True):
+        file_id = self.get_path_fid(path, update=update)
+        return self.get_fid_list(file_id, update=update)
 
-    def get_fid_list(self, file_id, auto_update=True):
-        self.auto_update_path_list(auto_update)
+    def get_fid_list(self, file_id, update=True):
         if not file_id:
-            raise Exception('No such file or directory')
+            raise FileNotFoundError(Path)
+        self.auto_update_path_list(update, file_id)
         if file_id != 'root' and self._tree.get_node(file_id).data.type:
             return [self._tree.get_node(file_id).data]
         return [i.data for i in self._tree.children(file_id)]
 
-    def get_path_fid(self, path, file_id='root', auto_update=True):
-        self.auto_update_path_list(auto_update)
+    def get_path_fid(self, path, file_id='root', update=True):
         path = Path(path).as_posix().replace('\\', '/')
         if str(path) in ('', '/', '\\', '.', 'root'):
             return 'root'
@@ -73,7 +73,11 @@ class PathList:
             path_list = path_list[1:]
         for i in path_list:
             flag = False
-            for j in self._tree.children(file_id):
+            node_list = self._tree.children(file_id)
+            if not node_list:
+                self.auto_update_path_list(update, file_id)
+                node_list = self._tree.children(file_id)
+            for j in node_list:
                 if i == j.tag:
                     flag = True
                     file_id = j.identifier
@@ -84,26 +88,35 @@ class PathList:
             return file_id
         return False
 
-    def get_path_node(self, path, auto_update=True):
-        file_id = self.get_path_fid(path, auto_update=auto_update)
+    def get_path_node(self, path, update=True):
+        file_id = self.get_path_fid(path, update=update)
         if file_id:
             return self._tree.get_node(file_id)
         return False
 
-    def get_path_parent_node(self, path, auto_update=True):
-        file_id = self.get_path_fid(path, auto_update=auto_update)
+    def get_path_parent_node(self, path, update=True):
+        file_id = self.get_path_fid(path, update=update)
         if file_id:
             node = self._tree.parent(file_id)
             if node:
                 return node
         return False
 
-    def auto_update_path_list(self, auto_update=True):
-        if auto_update and len(self._tree) == 1:
+    def auto_update_path_list(self, update=True, file_id=None):
+        if not update and file_id:
+            return self.update_path_list(file_id, depth=0)
+        elif update and len(self._tree) == 1:
             return self.update_path_list()
 
 
 def parse_share_url(url):
     name, content_hash, size, path = url.split('aliyunpan://')[1].split('|')[:4]
-    share_info = ShareInfo(name=name, content_hash=content_hash, size=size, path=Path(path.strip()))
+    split_list = [':', '=']
+    content_hash_name = ''
+    for i in split_list:
+        if i in content_hash:
+            content_hash_name, content_hash = content_hash.split(i)
+            break
+    share_info = ShareInfo(name=name, content_hash=content_hash, content_hash_name=content_hash_name, size=size,
+                           path=Path(path.strip()))
     return share_info

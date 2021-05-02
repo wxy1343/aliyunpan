@@ -52,8 +52,7 @@ class Commander:
                 raise Exception('Configuration file error.')
 
     def ls(self, path, l):
-        self._path_list.get_path_list(path)
-        for i in self._path_list.get_path_list(path):
+        for i in self._path_list.get_path_list(path, update=False):
             if l:
                 if i.type:
                     print(StrOfSize(i.size), time.strftime('%d %b %H:%M', i.ctime), i.id, i.name)
@@ -66,28 +65,33 @@ class Commander:
         return self._path_list.tree(path)
 
     def rm(self, path):
-        file_id = self._path_list.get_path_fid(path)
+        file_id = self._path_list.get_path_fid(path, update=False)
+        if not file_id:
+            raise FileNotFoundError(path)
         file_id_ = self._disk.delete_file(file_id)
         if file_id_ == file_id:
             self._path_list._tree.remove_node(file_id)
             print(f'[-][rm]{path}')
         return file_id_
 
-    def mv(self, path, target_path, update=False):
-        file_id = self._path_list.get_path_fid(path)
-        _ = self._disk.move_file(self._path_list.get_path_fid(path), self._path_list.get_path_fid(target_path))
-        if update:
-            if _ and file_id:
-                self._path_list._tree.remove_node(file_id)
-            self._path_list.update_path_list(target_path, is_fid=False)
+    def mv(self, path, target_path):
+        file_id = self._path_list.get_path_fid(path, update=False)
+        _ = self._disk.move_file(self._path_list.get_path_fid(path, update=False),
+                                 self._path_list.get_path_fid(target_path, update=False))
+        if _ and file_id:
+            print(f'[+][mv]{path} -> {target_path}')
+            self._path_list._tree.remove_node(file_id)
+            self._path_list.update_path_list(Path(target_path) / path, is_fid=False)
+        else:
+            print(f'[-][mv]{path} -> {target_path}')
         return _
 
     def mkdir(self, path, update=False):
         path = Path(Path(path).as_posix().replace('\\', '/'))
-        file_id = self._path_list.get_path_fid(path)
+        file_id = self._path_list.get_path_fid(path, update=False)
         if file_id:
             return True
-        parent_file_id = self._path_list.get_path_fid(path.parent)
+        parent_file_id = self._path_list.get_path_fid(path.parent, update=False)
         if not parent_file_id:
             parent_file_id = self.mkdir(path.parent)
         r = self._disk.create_file(path.name, parent_file_id)
@@ -116,13 +120,13 @@ class Commander:
                     share_list = []
                     if share:
                         share_info = parse_share_url(path)
-                        file = self._path_list.get_path_node(share_info.name)
+                        file = self._path_list.get_path_node(share_info.name, update=False)
                         if file and not file.data.type:
                             path = path.replace(share_info.name, share_info.name + str(int(time.time())))
                             share_info = parse_share_url(path)
-                        if not self._path_list.get_path_fid(share_info.name):
+                        if not self._path_list.get_path_fid(share_info.name, update=False):
                             self.upload_share(share_info)
-                            self._path_list.update_path_list(depth=1)
+                            self._path_list.update_path_list(depth=0)
                         for line in self.cat(share_info.name).split('\n'):
                             if line.startswith(self._share_link):
                                 share_list.append(parse_share_url(line))
@@ -143,17 +147,17 @@ class Commander:
                                     share_list.append(parse_share_url(line))
                         return self.upload_share(share_list, upload_path, force)
                     else:
-                        file_id = self._disk.upload_file(self._path_list.get_path_fid(upload_path), path, timeout,
-                                                         retry, force)
+                        file_id = self._disk.upload_file(self._path_list.get_path_fid(upload_path, update=False),
+                                                         path, timeout, retry, force)
                         result_list.append(file_id)
                 elif path.is_dir():
                     if upload_path == 'root':
                         upload_path = '/'
                     upload_path = Path(upload_path)
                     upload_file_list = self.upload_dir(path, upload_path, timeout, retry, force)
-                    self._path_list.update_path_list(upload_path, is_fid=False)
                     for file in upload_file_list:
-                        result = self._disk.upload_file(self._path_list.get_path_fid(file[0]), *file[1])
+                        result = self._disk.upload_file(self._path_list.get_path_fid(file[0], update=False),
+                                                        *file[1])
                         result_list.append(result)
                 else:
                     raise FileNotFoundError
@@ -163,7 +167,7 @@ class Commander:
 
     def upload_dir(self, path, upload_path, timeout, retry, force):
         upload_path = upload_path / path.name
-        if not self._path_list.get_path_fid(upload_path):
+        if not self._path_list.get_path_fid(upload_path, update=False):
             self.mkdir(upload_path)
         upload_file_list = []
         for file in path.iterdir():
@@ -185,11 +189,14 @@ class Commander:
             if not str(upload_path) and str(path) == 'root':
                 path = Path('')
             parent_file_id = self._path_list.get_path_fid(upload_path / path)
-            if self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.size, parent_file_id,
-                                          force):
-                p = Path(upload_path / path / share_info.name).as_posix().replace('\\', '/')
+            r = self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.content_hash_name,
+                                           share_info.size, parent_file_id, force)
+            p = Path(upload_path / path / share_info.name).as_posix().replace('\\', '/')
+            if r:
                 print(f'[+]{p} 快速上传成功')
-        return True
+            else:
+                print(f'[-]{p}')
+        return r
 
     def download(self, path, save_path, single_file=False):
         if save_path == '':
@@ -202,10 +209,11 @@ class Commander:
         for path in path_list:
             if isinstance(path, (Path, str)):
                 path = Path(path)
-                node = self._path_list.get_path_node(path)
+                node = self._path_list.get_path_node(path, update=False)
                 if not node:
                     raise FileNotFoundError(path)
                 file_node = node.data
+                self._path_list.update_path_list(file_node.id)
                 if file_node.type:
                     single_file = True
             else:
@@ -262,21 +270,24 @@ class Commander:
         print(f'[+][download]{path}')
         return True
 
-    def cat(self, path):
-        file_id = self._path_list.get_path_node(path)
-        if not file_id:
+    def cat(self, path, encoding='utf-8'):
+        file_node = self._path_list.get_path_node(path, update=False)
+        if not file_node:
             raise FileNotFoundError(path)
-        file = file_id.data
+        file = file_node.data
+        self._path_list.update_path_list(file.id)
         r = self._req.get(file.download_url)
+        r.encoding = encoding
         return r.text
 
     def share(self, path, file_id, expire_sec, share_link, download_link, save):
         def share_(path, file_id, parent_file=''):
             if path:
-                file_id = self._path_list.get_path_node(path)
-                if not file_id:
+                file_node = self._path_list.get_path_node(path, update=False)
+                if not file_node:
                     raise FileNotFoundError(path)
-                file = file_id.data
+                file = file_node.data
+                self._path_list.update_path_list(file.id)
             else:
                 file = self._path_list._tree.get_node(file_id).data
             if file.type:
