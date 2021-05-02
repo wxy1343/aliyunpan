@@ -44,6 +44,7 @@ echo "password: 'xxxxx'"  >>  ~/.config/aliyunpan.yaml
 |upload (u)          |上传文件/文件夹                  |
 |share (s)           |分享文件                        |
 |mkdir (m)           |创建文件夹                      |
+|cat (c)             |显示文件内容                    |
 
 ## 使用指南
 
@@ -162,6 +163,11 @@ python main.py COMMAND -h
                 <td>upload</td>
                 <td>-f, --force</td>
                 <td>强制覆盖文件</td>
+            </tr>        
+            <tr>
+                <td>cat</td>
+                <td>-e, --encoding</td>
+                <td>文件编码</td>
             </tr>
         </tbody>
     </table>

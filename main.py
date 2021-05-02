@@ -7,7 +7,7 @@ from aliyunpan.cli.cli import Commander
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='1.2.0')
+@click.version_option(version='1.2.1')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=str, help='Specify REFRESH_TOKEN.')
@@ -106,6 +106,14 @@ def share(path, file_id, expire_sec, share_link, download_link, save):
         commander.share(path, file_id, expire_sec, share_link, download_link, save)
     else:
         raise click.MissingParameter(param=click.get_current_context().command.params[1])
+
+
+@cli.command(aliases=['c'], help='Show file content.')
+@click.help_option('-h', '--help')
+@click.argument('path', type=click.Path(), default='')
+@click.option('-e', '--encoding', type=str, default='utf-8', show_default=True)
+def cat(path, encoding):
+    click.echo(commander.cat(path, encoding))
 
 
 if __name__ == '__main__':
