@@ -134,7 +134,7 @@ python main.py COMMAND -h
                 <td>分享过期时间(秒)，默认最大14400</td>
             </tr>        
             <tr>
-                <td>share_link</td>
+                <td>share</td>
                 <td>-l, --share-link</td>
                 <td>输出分享链接</td>
             </tr>        
