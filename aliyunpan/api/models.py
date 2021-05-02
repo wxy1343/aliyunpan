@@ -1,5 +1,5 @@
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from treelib import Tree
 
@@ -64,11 +64,11 @@ class PathList:
         return [i.data for i in self._tree.children(file_id)]
 
     def get_path_fid(self, path, file_id='root', update=True):
-        path = Path(path).as_posix().replace('\\', '/')
+        path = PurePosixPath(str(path).replace('\\', '/'))
         if str(path) in ('', '/', '\\', '.', 'root'):
             return 'root'
         flag = False
-        path_list = list(filter(None, path.split('/')))
+        path_list = list(filter(None, str(path).split('/')))
         if path_list[0] == 'root':
             path_list = path_list[1:]
         for i in path_list:
