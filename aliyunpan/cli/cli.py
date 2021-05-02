@@ -93,7 +93,6 @@ class Commander:
             return file_id_list
         file_id = self._path_list.get_path_fid(path, update=False)
         if file_id and file_id != 'root':
-            file_id_list.append((file_id, path))
             return file_id_list
         parent_file_id = self._path_list.get_path_fid(path.parent, update=False)
         if not parent_file_id:
@@ -230,6 +229,7 @@ class Commander:
                 for file_id, path in file_list:
                     self.download_file(save_path / path, self._disk.get_download_url(file_id))
                 for file_id, path in file_list:
+                    self._path_list.update_path_list(path.parent, depth=0, is_fid=False)
                     try:
                         self.rm(path)
                     except FileNotFoundError:
