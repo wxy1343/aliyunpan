@@ -219,6 +219,7 @@ class Commander:
         for path in path_list:
             if str(path).startswith(self._share_link) or share:
                 folder_list, file_list = self.upload(path, share=share)
+                folder_list = sorted(folder_list, key=lambda x: x[1])
                 for file_id, path in folder_list:
                     p = save_path / path
                     try:
@@ -229,8 +230,10 @@ class Commander:
                 for file_id, path in file_list:
                     self.download_file(save_path / path, self._disk.get_download_url(file_id))
                 for file_id, path in file_list:
-                    self.rm(path)
-                folder_list = sorted(folder_list, key=lambda x: x[1])
+                    try:
+                        self.rm(path)
+                    except FileNotFoundError:
+                        pass
                 for file_id, path in folder_list:
                     try:
                         self.rm(path)
