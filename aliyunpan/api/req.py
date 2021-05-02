@@ -29,20 +29,20 @@ class Req:
         except requests.exceptions.RequestException:
             raise
 
-    def get(self, *args, **kwargs):
+    def get(self, *args, **kwargs) -> requests.models.Response:
         return self._req('get', *args, **kwargs)
 
-    def post(self, *args, **kwargs):
+    def post(self, *args, **kwargs) -> requests.models.Response:
         return self._req('post', *args, **kwargs)
 
-    def put(self, *args, **kwargs):
+    def put(self, *args, **kwargs) -> requests.models.Response:
         return self._req('put', *args, **kwargs)
 
-    def head(self, *args, **kwargs):
+    def head(self, *args, **kwargs) -> requests.models.Response:
         return self._req('head', *args, **kwargs)
 
-    def options(self, *args, **kwargs):
+    def options(self, *args, **kwargs) -> requests.models.Response:
         return self._req('options', *args, **kwargs)
 
-    def req(self, method, *args, **kwargs):
+    def req(self, method, *args, **kwargs) -> requests.models.Response:
         return self._req(method, *args, **kwargs)
