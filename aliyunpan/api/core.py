@@ -60,19 +60,25 @@ class AliyunPan(object):
             return self._refresh_token
         return False
 
-    def get_file_list(self, parent_file_id: str = 'root') -> dict:
+    def get_file_list(self, parent_file_id: str = 'root', next_marker: str = None) -> dict:
         """
         获取文件列表
         :param parent_file_id:
+        :param next_marker:
         :return:
         """
         url = 'https://api.aliyundrive.com/v2/file/list'
-        json = {"drive_id": self.drive_id, "parent_file_id": parent_file_id, 'fields': '*'}
+        json = {"drive_id": self.drive_id, "parent_file_id": parent_file_id, 'fields': '*', 'marker': next_marker}
         headers = {'Authorization': self.access_token}
         logger.info(f'Get the list of parent_file_id {parent_file_id}.')
         r = self._req.post(url, headers=headers, json=json)
         logger.debug(r.status_code)
-        return r.json()
+        if 'items' not in r.json():
+            return False
+        file_list = r.json()['items']
+        if 'next_marker' in r.json() and r.json()['next_marker'] and next_marker != r.json()['next_marker']:
+            file_list.extend(self.get_file_list(parent_file_id, r.json()['next_marker']))
+        return file_list
 
     def delete_file(self, file_id: str):
         """
@@ -109,9 +115,13 @@ class AliyunPan(object):
         headers = {'Authorization': self.access_token}
         logger.info(f'Move files {file_id} to {parent_file_id}')
         r = self._req.post(url, headers=headers, json=json)
+
         logger.debug(r.status_code)
         if r.status_code == 200:
-            return True
+            if 'message' in r.json()['responses'][0]['body']:
+                print(r.json()['responses'][0]['body']['message'])
+                return False
+            return r.json()['responses'][0]['id']
         return False
 
     def get_user_info(self) -> UserInfo:
@@ -361,10 +371,11 @@ class AliyunPan(object):
         logger.debug(f'file_id:{file_id},expire_sec:{expire_sec},url:{url}')
         return url
 
-    def save_share_link(self, name: str, content_hash: str, size: str, parent_file_id: str = 'root',
-                        force: bool = False) -> bool:
+    def save_share_link(self, name: str, content_hash: str, content_hash_name: str, size: str,
+                        parent_file_id: str = 'root', force: bool = False) -> bool:
         """
         保存分享文件
+        :param content_hash_name:
         :param name:
         :param content_hash:
         :param size:
@@ -373,8 +384,10 @@ class AliyunPan(object):
         :return:
         """
         logger.info(f'name: {name}, content_hash:{content_hash}, size:{size}')
-        json = {'content_hash': content_hash, 'size': int(size)}
+        json = {'content_hash': content_hash, 'size': int(size), 'content_hash_name': content_hash_name or 'sha1'}
         r = self.create_file(name, parent_file_id=parent_file_id, file_type=True, json=json, force=force)
         if r.status_code == 201 and 'rapid_upload' in r.json() and r.json()['rapid_upload']:
             return True
+        elif 'message' in r.json():
+            print(r.json()["message"])
         return False
