@@ -114,6 +114,10 @@ python main.py COMMAND -h
                 <td>-p, --file</td>
                 <td>选择文件(多个)</td>
             </tr>
+                <td>download</td>
+                <td>-s, share</td>
+                <td>指定分享的序列文件</td>
+            </tr>
             <tr>
                 <td>ls</td>
                 <td>-l</td>
@@ -163,6 +167,11 @@ python main.py COMMAND -h
                 <td>upload</td>
                 <td>-f, --force</td>
                 <td>强制覆盖文件</td>
+            </tr>
+            </tr>
+                <td>upload</td>
+                <td>-s, share</td>
+                <td>指定分享的序列文件</td>
             </tr>        
             <tr>
                 <td>cat</td>

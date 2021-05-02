@@ -86,14 +86,19 @@ class Commander:
             print(f'[-][mv]{path} -> {target_path}')
         return _
 
-    def mkdir(self, path, update=False):
-        path = Path(Path(path).as_posix().replace('\\', '/'))
+    def mkdir(self, path):
+        file_id_list = []
+        path = PurePosixPath(str(path).replace('\\', '/'))
+        if str(path) == 'root':
+            return file_id_list
         file_id = self._path_list.get_path_fid(path, update=False)
-        if file_id:
-            return True
+        if file_id and file_id != 'root':
+            file_id_list.append((file_id, path))
+            return file_id_list
         parent_file_id = self._path_list.get_path_fid(path.parent, update=False)
         if not parent_file_id:
-            parent_file_id = self.mkdir(path.parent)
+            file_id_list.extend(self.mkdir(path.parent))
+            parent_file_id, _ = file_id_list[-1]
         r = self._disk.create_file(path.name, parent_file_id)
         try:
             file_id = r.json()['file_id']
@@ -102,11 +107,9 @@ class Commander:
             return False
         if file_id:
             print(f'[+][mkdir]{path}')
-            if update:
-                self._path_list.update_path_list(path.parent, is_fid=False)
-            else:
-                self._path_list._tree.create_node(tag=path.name, identifier=file_id, parent=parent_file_id)
-        return file_id
+            self._path_list._tree.create_node(tag=path.name, identifier=file_id, parent=parent_file_id)
+            file_id_list.append((file_id, path))
+        return file_id_list
 
     def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False, share=False):
         if isinstance(path, str):
@@ -182,24 +185,31 @@ class Commander:
             share_info_list = [share_info_list]
         if upload_path == 'root':
             upload_path = ''
+        folder_list = []
+        file_list = []
         for share_info in share_info_list:
-            self.mkdir(upload_path / share_info.path)
+            file_id_list = self.mkdir(upload_path / share_info.path)
+            if file_id_list:
+                for file_id, path in file_id_list:
+                    folder_list.append((file_id, upload_path / path))
+        folder_list = tuple(set(folder_list))
         for share_info in share_info_list:
             path = share_info.path
             if not str(upload_path) and str(path) == 'root':
                 path = Path('')
             parent_file_id = self._path_list.get_path_fid(upload_path / path)
-            r = self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.content_hash_name,
-                                           share_info.size, parent_file_id, force)
-            p = Path(upload_path / path / share_info.name).as_posix().replace('\\', '/')
-            if r:
+            result = self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.content_hash_name,
+                                                share_info.size, parent_file_id, force)
+            p = PurePosixPath(str(upload_path / path / share_info.name).replace('\\', '/'))
+            file_list.append((result, p))
+            if result:
                 print(f'[+]{p} 快速上传成功')
             else:
                 print(f'[-]{p}')
-        return r
+        return folder_list, file_list
 
-    def download(self, path, save_path, single_file=False):
-        if save_path == '':
+    def download(self, path, save_path, single_file=False, share=False):
+        if not save_path:
             save_path = Path().cwd()
         save_path = Path(save_path)
         if isinstance(path, str):
@@ -207,8 +217,28 @@ class Commander:
         else:
             path_list = path
         for path in path_list:
-            if isinstance(path, (Path, str)):
-                path = Path(path)
+            if str(path).startswith(self._share_link) or share:
+                folder_list, file_list = self.upload(path, share=share)
+                for file_id, path in folder_list:
+                    p = save_path / path
+                    try:
+                        p.mkdir(parents=True)
+                        print(f'[+][mkdir]{p}')
+                    except FileExistsError:
+                        pass
+                for file_id, path in file_list:
+                    self.download_file(save_path / path, self._disk.get_download_url(file_id))
+                for file_id, path in file_list:
+                    self.rm(path)
+                folder_list = sorted(folder_list, key=lambda x: x[1])
+                for file_id, path in folder_list:
+                    try:
+                        self.rm(path)
+                    except FileNotFoundError:
+                        pass
+                continue
+            if isinstance(path, (Path, PurePosixPath, str)):
+                path = PurePosixPath(str(path).replace('\\', '/'))
                 node = self._path_list.get_path_node(path, update=False)
                 if not node:
                     raise FileNotFoundError(path)

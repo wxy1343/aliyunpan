@@ -7,7 +7,7 @@ from aliyunpan.cli.cli import Commander
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='1.2.1')
+@click.version_option(version='1.3.0')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=str, help='Specify REFRESH_TOKEN.')
@@ -77,13 +77,14 @@ def mkdir(path):
 @click.argument('path', type=click.Path(), default='')
 @click.option('-p', '--file', multiple=True, help='Select multiple files.', type=click.Path())
 @click.argument('save_path', type=click.Path(), default='')
-def download(path, file, save_path):
+@click.option('-s', 'share', is_flag=True, help='Specify the shared sequence file')
+def download(path, file, save_path, share):
     if not path and not file:
         raise click.MissingParameter(param=click.get_current_context().command.params[2])
     else:
         file_list = {*file, path}
 
-    commander.download(file_list, save_path)
+    commander.download(file_list, save_path, share=share)
 
 
 @cli.command(aliases=['t', 'show'], help='View file tree.')
