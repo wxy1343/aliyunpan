@@ -65,7 +65,7 @@ class PathList:
         return [i.data for i in self._tree.children(file_id)]
 
     def get_path_fid(self, path, file_id='root', update=True):
-        path = PurePosixPath(str(path).replace('\\', '/'))
+        path = PurePosixPath(Path(path).as_posix())
         if str(path) in ('', '/', '\\', '.', 'root'):
             return 'root'
         flag = False
