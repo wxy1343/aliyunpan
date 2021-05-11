@@ -1,6 +1,8 @@
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
+from aliyunpan.common import *
+
 __all__ = ['Req']
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -20,10 +22,9 @@ class Req:
         try:
             kwargs.setdefault('timeout', self._timeout)
             kwargs.setdefault('verify', self._verify)
-            if 'headers' in kwargs:
-                kwargs['headers'].update(self._headers)
-            else:
-                kwargs['headers'] = self._headers
+            kwargs['headers'] = kwargs['headers'] if 'headers' in kwargs else {}
+            kwargs['headers']['Authorization'] = GLOBAL_VAR.access_token
+            kwargs['headers'].update(self._headers)
             r = getattr(self._session, method.lower())(*args, **kwargs)
             return r
         except requests.exceptions.RequestException:
