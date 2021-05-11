@@ -4,9 +4,9 @@ import json
 import logging
 import os
 
-__all__ = ['ROOT_DIR', 'logger', 'get_sha1', 'StrOfSize', 'encrypt', 'parse_biz_ext']
-
 import rsa
+
+__all__ = ['ROOT_DIR', 'logger', 'get_sha1', 'StrOfSize', 'encrypt', 'parse_biz_ext']
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(ROOT_DIR))
@@ -53,7 +53,7 @@ def StrOfSize(size):
     integer, remainder, level = strofsize(size, 0, 0)
     if level + 1 > len(units):
         level = -1
-    return ('{}.{:>03d}{}'.format(integer, remainder, units[level]))
+    return '{}.{:>03d}{}'.format(integer, remainder, units[level])
 
 
 # RSA encrypt
