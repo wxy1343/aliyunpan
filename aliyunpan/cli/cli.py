@@ -9,6 +9,9 @@ from aliyunpan.api.models import *
 from aliyunpan.api.req import *
 from aliyunpan.api.utils import *
 from aliyunpan.cli.config import Config
+from aliyunpan.common import *
+from aliyunpan.exceptions import InvalidRefreshToken, InvalidPassword, LoginFailed, InvalidConfiguration, \
+    ConfigurationFileNotFoundError
 
 __all__ = ['Commander']
 
@@ -19,22 +22,30 @@ class Commander:
         self._path_list = PathList(self._disk)
         self._req = Req()
         self._config = Config()
+        self._task_config = Config('tasks.yaml')
         self._share_link = 'aliyunpan://'
-        self._txt = ''
+        GLOBAL_VAR.tasks = self._task_config.read()
+        GLOBAL_VAR.txt = ''
+
+    def __del__(self):
+        if GLOBAL_VAR.tasks:
+            for key, value in GLOBAL_VAR.tasks.items():
+                self._task_config.update(key, value)
 
     def init(self, config_file='~/.config/aliyunpan.yaml', refresh_token=None, username=None, password=None, depth=3):
         self._path_list.depth = depth
-        spectify_conf_file = os.environ.get("ALIYUNPAN_CONF", "")
+        specify_conf_file = os.environ.get("ALIYUNPAN_CONF", "")
         config_file = list(
-            filter(lambda x: Path(x).is_file(), map(lambda x: Path(x).expanduser(), [spectify_conf_file, config_file])))
+            filter(lambda x: Path(x).is_file(), map(lambda x: Path(x).expanduser(), [specify_conf_file, config_file])))
         if refresh_token:
             if not len(refresh_token) == 32:
-                raise Exception('Is not a valid refresh_token')
+                raise InvalidRefreshToken
             self._disk.refresh_token = refresh_token
         elif username:
             if not password:
-                raise Exception('Password not found.')
-            self._disk.login(username, password)
+                raise InvalidPassword
+            if not self._disk.login(username, password):
+                raise LoginFailed
         elif config_file:
             self._config.config_file = config_file[0]
             refresh_token = self._config.get('refresh_token')
@@ -42,14 +53,17 @@ class Commander:
             password = self._config.get('password')
             if refresh_token:
                 if not len(refresh_token) == 32:
-                    raise Exception('Is not a valid refresh_token')
+                    raise InvalidRefreshToken
                 self._disk.refresh_token = refresh_token
             elif username:
                 if not password:
-                    raise Exception('Password not found.')
-                self._disk.login(username, password)
+                    raise InvalidPassword
+                if not self._disk.login(username, password):
+                    raise LoginFailed
             else:
-                raise Exception('Configuration file error.')
+                raise InvalidConfiguration
+        else:
+            raise ConfigurationFileNotFoundError
 
     def ls(self, path, l):
         for i in self._path_list.get_path_list(path, update=False):
@@ -88,7 +102,7 @@ class Commander:
 
     def mkdir(self, path):
         file_id_list = []
-        path = PurePosixPath(str(path).replace('\\', '/'))
+        path = PurePosixPath(Path(path).as_posix())
         if str(path) == 'root':
             return file_id_list
         file_id = self._path_list.get_path_fid(path, update=False)
@@ -110,7 +124,8 @@ class Commander:
             file_id_list.append((file_id, path))
         return file_id_list
 
-    def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False, share=False):
+    def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False, share=False, chunk_size=None,
+               c=False):
         if isinstance(path, str):
             path_list = (path,)
         else:
@@ -150,16 +165,16 @@ class Commander:
                         return self.upload_share(share_list, upload_path, force)
                     else:
                         file_id = self._disk.upload_file(self._path_list.get_path_fid(upload_path, update=False),
-                                                         path, timeout, retry, force)
+                                                         path, timeout, retry, force, chunk_size, c)
                         result_list.append(file_id)
                 elif path.is_dir():
                     if upload_path == 'root':
                         upload_path = '/'
                     upload_path = Path(upload_path)
-                    upload_file_list = self.upload_dir(path, upload_path, timeout, retry, force)
+                    upload_file_list = self.upload_dir(path, upload_path)
                     for file in upload_file_list:
                         result = self._disk.upload_file(self._path_list.get_path_fid(file[0], update=False),
-                                                        *file[1])
+                                                        file[1], timeout, retry, chunk_size, c)
                         result_list.append(result)
                 else:
                     raise FileNotFoundError
@@ -167,23 +182,24 @@ class Commander:
             result_list = result_list[0]
         return result_list
 
-    def upload_dir(self, path, upload_path, timeout, retry, force):
+    def upload_dir(self, path, upload_path):
         upload_path = upload_path / path.name
         if not self._path_list.get_path_fid(upload_path, update=False):
             self.mkdir(upload_path)
         upload_file_list = []
         for file in path.iterdir():
             if file.is_dir():
-                upload_file_list.extend(self.upload_dir(file, upload_path, timeout, retry, force))
+                upload_file_list.extend(self.upload_dir(file, upload_path))
             else:
-                upload_file_list.append([upload_path, (file, timeout, retry, force)])
+                upload_file_list.append([upload_path, file])
         return upload_file_list
 
-    def upload_share(self, share_info_list, upload_path='root', force=False):
+    def upload_share(self, share_info_list: ShareInfo, upload_path='root', force=False):
         if not isinstance(share_info_list, list):
             share_info_list = [share_info_list]
         if upload_path == 'root':
             upload_path = ''
+        upload_path = PurePosixPath(Path(upload_path).as_posix())
         folder_list = []
         file_list = []
         for share_info in share_info_list:
@@ -199,7 +215,7 @@ class Commander:
             parent_file_id = self._path_list.get_path_fid(upload_path / path)
             result = self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.content_hash_name,
                                                 share_info.size, parent_file_id, force)
-            p = PurePosixPath(str(upload_path / path / share_info.name).replace('\\', '/'))
+            p = PurePosixPath(Path(upload_path / path / share_info.name).as_posix())
             file_list.append((result, p))
             if result:
                 print(f'[+]{p} 快速上传成功')
@@ -241,7 +257,7 @@ class Commander:
                         pass
                 continue
             if isinstance(path, (Path, PurePosixPath, str)):
-                path = PurePosixPath(str(path).replace('\\', '/'))
+                path = PurePosixPath(Path(path).as_posix())
                 node = self._path_list.get_path_node(path, update=False)
                 if not node:
                     raise FileNotFoundError(path)
@@ -336,19 +352,19 @@ class Commander:
                     share_txt += '导入链接'.center(50, '*') + '\n'
                     share_txt += f'python main.py upload "{url}"' + '\n\n'
                 print(share_txt)
-                self._txt += share_txt
+                GLOBAL_VAR.txt += share_txt
             else:
                 for i in self._path_list.get_fid_list(file.id):
                     share_(path=None, file_id=i.id, parent_file=Path(parent_file) / file.name)
 
-        self._txt += '*' * 50 + '\n'
-        self._txt += '项目地址: https://github.com/wxy1343/aliyunpan' + '\n'
-        self._txt += '*' * 50 + '\n\n'
+        GLOBAL_VAR.txt += '*' * 50 + '\n'
+        GLOBAL_VAR.txt += '项目地址: https://github.com/wxy1343/aliyunpan' + '\n'
+        GLOBAL_VAR.txt += '*' * 50 + '\n\n'
         share_(path, file_id)
         if save:
             file_name = Path(path).name + f'{int(time.time())}.txt'
             with open(file_name, 'w', encoding='utf-8') as f:
-                f.write(self._txt)
+                f.write(GLOBAL_VAR.txt)
             print('文件导入'.center(50, '*'))
             print(f'python main.py upload -s {file_name}')
             print('链接导入'.center(50, '*'))

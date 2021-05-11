@@ -156,7 +156,7 @@ python main.py COMMAND -h
             <tr>
                 <td>upload</td>
                 <td>-t, --time-out</td>
-                <td>上传超时时间(秒)</td>
+                <td>分块上传超时时间(秒)</td>
             </tr>        
             <tr>
                 <td>upload</td>
@@ -172,6 +172,16 @@ python main.py COMMAND -h
                 <td>upload</td>
                 <td>-s, share</td>
                 <td>指定分享的序列文件</td>
+            </tr> 
+            </tr>
+                <td>upload</td>
+                <td>-cs, --chunk-size</td>
+                <td>分块大小(字节)</td>
+            </tr> 
+            </tr>
+                <td>upload</td>
+                <td>-c</td>
+                <td>断点续传</td>
             </tr>        
             <tr>
                 <td>cat</td>
@@ -181,6 +191,22 @@ python main.py COMMAND -h
         </tbody>
     </table>
 </details>
+
+### 断点续传
+
+* 将文件分成多块顺序上传
+* 文件上传进度保存在当前目录下的tasks.yaml
+* 格式
+  ```yaml
+  文件sha1:
+    path: 绝对路径
+    upload_id: 上传id
+    file_id: 文件id
+    chunk_size: 分块大小
+    part_number: 最后上传的分块编号
+  ```
+* 文件未上传成功时，CTRL+C会自动保存
+* 断点续传需带上参数-c
 
 ### 分享
 

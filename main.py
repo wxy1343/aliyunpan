@@ -3,11 +3,12 @@ import click
 from click_aliases import ClickAliasedGroup
 
 from aliyunpan.cli.cli import Commander
+from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='1.3.0')
+@click.version_option(version='1.4.0')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=str, help='Specify REFRESH_TOKEN.')
@@ -22,7 +23,7 @@ def cli(config_file, refresh_token, username, password, depth):
     elif config_file:
         commander.init(config_file=config_file, depth=depth)
     else:
-        raise FileNotFoundError(f'Configuration file not found.')
+        raise ConfigurationFileNotFoundError
 
 
 @cli.command(aliases=['l', 'list', 'dir'], help='List files.')
@@ -53,16 +54,18 @@ def mv(path, target_path):
 @click.argument('path', type=click.Path(), default='')
 @click.option('-p', '--file', multiple=True, help='Select multiple files.', type=click.Path())
 @click.argument('upload_path', default='root')
-@click.option('-t', '--time-out', type=float, help='Upload timeout.', default=10.0, show_default=True)
+@click.option('-t', '--time-out', type=float, help='Chunk upload timeout(sec).', default=10.0, show_default=True)
 @click.option('-r', '--retry', type=int, help='number of retries.', default=3, show_default=True)
 @click.option('-f', '--force', is_flag=True, help='Force overlay file.')
-@click.option('-s', '--share', is_flag=True, help='Specify the shared sequence file')
-def upload(path, file, upload_path, time_out, retry, force, share):
+@click.option('-s', '--share', is_flag=True, help='Specify the shared sequence file.')
+@click.option('-cs', '--chunk-size', type=int, help='Chunk size(byte).', default=524288, show_default=True)
+@click.option('-c', is_flag=True, help='Breakpoint continuation.')
+def upload(path, file, upload_path, time_out, retry, force, share, chunk_size, c):
     if not path and not file:
         raise click.MissingParameter(param=click.get_current_context().command.params[2])
     else:
         path_list = {*file, path}
-    commander.upload(path_list, upload_path, time_out, retry, force, share)
+    commander.upload(path_list, upload_path, time_out, retry, force, share, chunk_size, c)
 
 
 @cli.command(aliases=['m'], help='Create folder.')

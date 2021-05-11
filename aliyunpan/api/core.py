@@ -1,7 +1,6 @@
-import math
-import os
 import sys
 import time
+from pathlib import Path
 
 import func_timeout
 import requests
@@ -9,6 +8,8 @@ import requests
 from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
 from aliyunpan.api.utils import *
+from aliyunpan.common import *
+from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException
 
 __all__ = ['AliyunPan']
 
@@ -23,6 +24,7 @@ class AliyunPan(object):
         self._refresh_token = refresh_token
         self._access_token_gen_ = self._access_token_gen()
         self._drive_id_gen_ = self._drive_id_gen()
+        self._chunk_size = 524288
 
     refresh_token = property(lambda self: self._refresh_token,
                              lambda self, value: setattr(self, '_refresh_token', value))
@@ -54,9 +56,15 @@ class AliyunPan(object):
         if 'bizExt' in r.json()['content']['data']:
             data = parse_biz_ext(r.json()['content']['data']['bizExt'])
             logger.debug(data)
-            self._access_token = data['pds_login_result']['accessToken']
-            self._refresh_token = data['pds_login_result']['refreshToken']
-            self._drive_id = data['pds_login_result']['defaultDriveId']
+            access_token = data['pds_login_result']['accessToken']
+            self._access_token = access_token
+            GLOBAL_VAR.access_token = access_token
+            refresh_token = data['pds_login_result']['refreshToken']
+            self._refresh_token = refresh_token
+            GLOBAL_VAR.refresh_token = refresh_token
+            drive_id = data['pds_login_result']['defaultDriveId']
+            self._drive_id = drive_id
+            GLOBAL_VAR.drive_id = drive_id
             return self._refresh_token
         return False
 
@@ -69,9 +77,8 @@ class AliyunPan(object):
         """
         url = 'https://api.aliyundrive.com/v2/file/list'
         json = {"drive_id": self.drive_id, "parent_file_id": parent_file_id, 'fields': '*', 'marker': next_marker}
-        headers = {'Authorization': self.access_token}
         logger.info(f'Get the list of parent_file_id {parent_file_id}.')
-        r = self._req.post(url, headers=headers, json=json)
+        r = self._req.post(url, json=json)
         logger.debug(r.status_code)
         if 'items' not in r.json():
             return False
@@ -91,9 +98,8 @@ class AliyunPan(object):
                               'headers': {'Content-Type': 'application/json'},
                               'id': file_id, 'method': 'POST',
                               'url': '/recyclebin/trash'}], 'resource': 'file'}
-        headers = {'Authorization': self.access_token}
         logger.info(f'Delete file {file_id}.')
-        r = self._req.post(url, headers=headers, json=json)
+        r = self._req.post(url, json=json)
         logger.debug(r.text)
         if r.status_code == 200:
             return r.json()['responses'][0]['id']
@@ -112,9 +118,8 @@ class AliyunPan(object):
                               "headers": {"Content-Type": "application/json"},
                               "id": file_id, "method": "POST", "url": "/file/move"}],
                 "resource": "file"}
-        headers = {'Authorization': self.access_token}
         logger.info(f'Move files {file_id} to {parent_file_id}')
-        r = self._req.post(url, headers=headers, json=json)
+        r = self._req.post(url, json=json)
 
         logger.debug(r.status_code)
         if r.status_code == 200:
@@ -130,9 +135,8 @@ class AliyunPan(object):
         :return:
         """
         url = 'https://api.aliyundrive.com/v2/user/get'
-        headers = {'Authorization': self.access_token}
         logger.info('Get user information.')
-        r = self._req.post(url, headers=headers, json={})
+        r = self._req.post(url, json={})
         user_info = r.json()
         id_ = user_info['user_id']
         nick_name = user_info['nick_name']
@@ -141,6 +145,8 @@ class AliyunPan(object):
         drive_id = user_info['default_drive_id']
         user_info = UserInfo(id=id_, nick_name=nick_name, ctime=ctime, phone=phone, drive_id=drive_id)
         logger.debug(user_info)
+        self._user_info = user_info
+        drive_id.user_info = user_info
         return user_info
 
     def create_file(self, file_name: str, parent_file_id: str = 'root', file_type: bool = False,
@@ -173,9 +179,8 @@ class AliyunPan(object):
             j.update(json)
         # 申请创建文件
         url = 'https://api.aliyundrive.com/v2/file/create'
-        headers = {'Authorization': self.access_token}
         logger.info(f'Create file {file_name} in file {parent_file_id}.')
-        r = self._req.post(url, headers=headers, json=j)
+        r = self._req.post(url, json=j)
         logger.debug(j)
         if force and 'exist' in r.json():
             self.delete_file(r.json()['file_id'])
@@ -183,122 +188,172 @@ class AliyunPan(object):
         return r
 
     def upload_file(self, parent_file_id: str = 'root', path: str = None, upload_timeout: float = 10,
-                    retry_num: int = 3, force: bool = False):
+                    retry_num: int = 3, force: bool = False, chunk_size: int = None, c: bool = False):
         """
         上传文件
-        :param retry_num:
         :param parent_file_id: 上传目录的id
         :param path: 上传文件路径
-        :param upload_timeout: 上传超时时间
+        :param upload_timeout: 分块上传超时时间
+        :param retry_num:
         :param force: 强制覆盖
+        :param chunk_size: 分块大小
+        :param c: 断点续传
         :return:
         """
-        split_size = 5242880  # 默认5MB分片大小(不要改)
-        file_size = os.path.getsize(path)
-        _, file_name = os.path.split(path)
+        path = Path(path)
+        file_size = path.stat().st_size
+        file_name = path.name
+        self._chunk_size = chunk_size or self._chunk_size
         # 获取sha1
-        content_hash = get_sha1(path, split_size)
+        content_hash = get_sha1(path, self._chunk_size)
         # 分片列表
         part_info_list = []
-        count = int(file_size / split_size) + 1
+        count = int(file_size / self._chunk_size) + 1
         for i in range(count):
             part_info_list.append({"part_number": i + 1})
         json = {"size": file_size, "part_info_list": part_info_list, "content_hash": content_hash}
+        task_info = {}
+        if content_hash in GLOBAL_VAR.tasks:
+            task_info = GLOBAL_VAR.tasks[content_hash]
+            file_id = task_info['file_id']
+            if task_info.upload_time:
+                return file_id
         print(f'[*][upload]{path}')
-        # 申请创建文件
-        r = self.create_file(file_name=file_name, parent_file_id=parent_file_id, file_type=True, json=json, force=force)
-        if 'rapid_upload' not in r.json():
-            message = r.json()['message']
-            logger.error(message)
-            raise Exception(message)
-        rapid_upload = r.json()['rapid_upload']
-        if rapid_upload:
-            print(f'[+][upload]{path}\t快速上传成功')
+        if c and task_info:
+            path = Path(task_info['path'])
+            upload_id = task_info['upload_id']
+            file_id = task_info['file_id']
+            self._chunk_size = task_info['chunk_size']
+            part_number = task_info['part_number']
+            part_info_list = self.get_upload_url(path, upload_id, file_id, self._chunk_size, part_number)
+        else:
+            # 申请创建文件
+            r = self.create_file(file_name=file_name, parent_file_id=parent_file_id, file_type=True, json=json,
+                                 force=force)
+            if 'rapid_upload' not in r.json():
+                message = r.json()['message']
+                logger.error(message)
+                raise AliyunpanException(message)
+            rapid_upload = r.json()['rapid_upload']
+            if rapid_upload:
+                print(f'[+][upload]{path}\t快速上传成功')
+                file_id = r.json()['file_id']
+                GLOBAL_VAR.tasks[content_hash] = {'path': str(path.absolute()), 'upload_time': time.time(),
+                                                  'file_id': file_id, 'chunk_size': self._chunk_size}
+                return file_id
+            else:
+                upload_id = r.json()['upload_id']
+                file_id = r.json()['file_id']
+                part_info_list = r.json()['part_info_list']
+                GLOBAL_VAR.tasks[content_hash] = {'path': str(path.absolute()),
+                                                  'upload_id': upload_id, 'file_id': file_id,
+                                                  'chunk_size': self._chunk_size, 'part_number': 1}
+        logger.debug(f'upload_id: {upload_id}, file_id: {file_id}, part_info_list: {part_info_list}')
+        total_time = 0
+        upload_info = f'\r上传中... [{"*" * 10}] %0'
+        show_upload_info = upload_info and file_size >= 1024 * 1024
+        for i in part_info_list:
+            part_number, upload_url = i['part_number'], i['upload_url']
+            GLOBAL_VAR.tasks[content_hash].part_number = part_number
+            with path.open('rb') as f:
+                f.seek((part_number - 1) * self._chunk_size)
+                chunk = f.read(self._chunk_size)
+            if not chunk:
+                break
+            size = len(chunk)
+            retry_count = 0
+            start_time = time.time()
+            while True:
+                if show_upload_info:
+                    sys.stdout.write(upload_info)
+                    sys.stdout.flush()
+                logger.debug(
+                    f'(upload_id={upload_id}, file_id={file_id}, size={size}): Upload part of {part_number} to {upload_url}.')
+                try:
+                    # 开始上传
+                    func_timeout.func_timeout(upload_timeout, lambda: self._req.put(upload_url, data=chunk))
+                    break
+                except func_timeout.exceptions.FunctionTimedOut:
+                    logger.warn('Upload timeout.')
+                    if retry_count is retry_num:
+                        sys.stdout.write(f'\rError:上传超时{retry_num}次，即将重新上传'.ljust(30))
+                        sys.stdout.flush()
+                        time.sleep(1)
+                        return self.upload_file(parent_file_id, path, upload_timeout)
+                    sys.stdout.write(f'\rError:上传超时'.ljust(30))
+                    sys.stdout.flush()
+                    retry_count += 1
+                    time.sleep(1)
+                except KeyboardInterrupt:
+                    raise
+                except:
+                    logger.error(sys.exc_info())
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    sys.stdout.write(f'\rError:{exc_type.__name__}'.ljust(30))
+                    sys.stdout.flush()
+                    time.sleep(1)
+                # 重试等待时间
+                n = 3
+                while n:
+                    sys.stdout.write(f'\r{n}秒后重试'.ljust(30))
+                    sys.stdout.flush()
+                    n -= 1
+                    time.sleep(1)
+                sys.stdout.write('\r')
+            end_time = time.time()
+            t = end_time - start_time
+            total_time += t
+            k = part_number / part_info_list[-1]['part_number']
+            upload_info = '\r上传中{:<3s} [{}{}] {:.2%} {:.2f}MB/s'.format(('.' * (part_number % 4)),
+                                                                        '=' * int(k * 10), '*' * (10 - int(k * 10)), k,
+                                                                        size / 1024 / 1024 / t)
+        # 上传完成保存文件
+        url = 'https://api.aliyundrive.com/v2/file/complete'
+        json = {
+            "ignoreError": True,
+            "drive_id": self.drive_id,
+            "file_id": file_id,
+            "upload_id": upload_id
+        }
+        r = self._req.post(url, json=json)
+        if r.status_code == 200:
+            total_time = int(total_time * 100) / 100
+            sys.stdout.write(
+                f'\r[+][upload]{path}\t上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{round(file_size / 1024 / 1024 / total_time)}MB/s\n')
+            sys.stdout.flush()
+            # GLOBAL_VAR.tasks[content_hash] = None
+            GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
             return r.json()['file_id']
         else:
-            upload_id = r.json()['upload_id']
-            file_id = r.json()['file_id']
-            part_info_list = r.json()['part_info_list']
-            part_info_list_new = []
-            total_time = 0
-            count_size = 0
-            k = 0
-            upload_info = f'\r上传中... [{"*" * 10}] %0'
-            show_upload_info = upload_info and file_size >= 1024 * 1024
-            for i in part_info_list:
-                part_number, upload_url = i['part_number'], i['upload_url']
-                with open(path, 'rb') as f:
-                    f.seek((part_number - 1) * split_size)
-                    chunk = f.read(split_size)
-                if not chunk:
-                    break
-                size = len(chunk)
-                retry_count = 0
-                start_time = time.time()
-                while True:
-                    if show_upload_info:
-                        sys.stdout.write(upload_info)
-                        sys.stdout.flush()
-                    try:
-                        # 开始上传
-                        r = func_timeout.func_timeout(upload_timeout,
-                                                      lambda: self._req.put(upload_url, data=chunk))
-                        logger.debug(i)
-                        break
-                    except func_timeout.exceptions.FunctionTimedOut:
-                        logger.warn('Upload timeout.')
-                        if retry_count is retry_num:
-                            sys.stdout.write(f'\rError:上传超时{retry_num}次，即将重新上传'.ljust(30))
-                            sys.stdout.flush()
-                            time.sleep(1)
-                            return self.upload_file(parent_file_id, path, upload_timeout)
-                        sys.stdout.write(f'\rError:上传超时'.ljust(30))
-                        sys.stdout.flush()
-                        retry_count += 1
-                        time.sleep(1)
-                    except KeyboardInterrupt:
-                        raise
-                    except:
-                        logger.error(sys.exc_info())
-                        exc_type, exc_value, exc_traceback = sys.exc_info()
-                        sys.stdout.write(f'\rError:{exc_type.__name__}'.ljust(30))
-                        sys.stdout.flush()
-                        time.sleep(1)
-                    # 重试等待时间
-                    n = 3
-                    while n:
-                        sys.stdout.write(f'\r{n}秒后重试'.ljust(30))
-                        sys.stdout.flush()
-                        n -= 1
-                        time.sleep(1)
-                    sys.stdout.write('\r')
-                end_time = time.time()
-                t = end_time - start_time
-                total_time += t
-                k += size / file_size
-                count_size += size
-                upload_info = f'\r上传中{"." * (part_number % 4)} [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10} {round(count_size / 1024 / 1024 / total_time, 2)}MB/s\t'
-            # 上传完成保存文件
-            url = 'https://api.aliyundrive.com/v2/file/complete'
-            json = {
-                "ignoreError": True,
-                "drive_id": self.drive_id,
-                "file_id": file_id,
-                "upload_id": upload_id,
-                "part_info_list": part_info_list_new
-            }
-            headers = {'Authorization': self.access_token}
-            r = self._req.post(url, headers=headers, json=json)
-            if r.status_code == 200:
-                total_time = int(total_time * 100) / 100
-                sys.stdout.write(
-                    f'\r[+][upload]{path}\t上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{round(file_size / 1024 / 1024 / total_time)}MB/s')
-                sys.stdout.flush()
-                return r.json()['file_id']
-            else:
-                sys.stdout.write(f'\r[-][upload]{path}')
-                sys.stdout.flush()
-                return False
+            sys.stdout.write(f'\r[-][upload]{path}\n')
+            sys.stdout.flush()
+            return False
+
+    def get_upload_url(self, path: str, upload_id: str, file_id: str, chunk_size: int, part_number: int = 1) -> list:
+        """
+        获取上传地址
+        :param path:
+        :param upload_id:
+        :param file_id:
+        :param chunk_size:
+        :param part_number:
+        :return:
+        """
+        url = 'https://api.aliyundrive.com/v2/file/get_upload_url'
+        path = Path(path)
+        file_size = path.stat().st_size
+        part_info_list = []
+        count = int(file_size / chunk_size) + 1
+        for i in range(count):
+            part_info_list.append({"part_number": i + 1})
+        json = {
+            "drive_id": self.drive_id,
+            "file_id": file_id,
+            "part_info_list": part_info_list,
+            "upload_id": upload_id,
+        }
+        r = self._req.post(url, json=json)
+        return r.json()['part_info_list'][part_number - 1:]
 
     def get_access_token(self) -> str:
         """
@@ -315,7 +370,9 @@ class AliyunPan(object):
         try:
             access_token = r.json()['access_token']
         except KeyError:
-            raise Exception('Is not a valid refresh_token')
+            raise InvalidRefreshToken
+        GLOBAL_VAR.refresh_token = self.refresh_token
+        GLOBAL_VAR.access_token = access_token
         logger.debug(access_token)
         return access_token
 
@@ -338,7 +395,10 @@ class AliyunPan(object):
         获取drive_id
         :return:
         """
-        return self.get_user_info().drive_id
+        drive_id = self.get_user_info().drive_id
+        self._drive_id = drive_id
+        GLOBAL_VAR.drive_id = drive_id
+        return drive_id
 
     def _drive_id_gen(self) -> str:
         """
@@ -362,10 +422,9 @@ class AliyunPan(object):
         :return:
         """
         url = 'https://api.aliyundrive.com/v2/file/get_download_url'
-        headers = {'Authorization': self.access_token}
         json = {'drive_id': self.drive_id, 'file_id': file_id, 'expire_sec': expire_sec}
         logger.info(f'Get file {file_id} download link, expiration time {expire_sec} seconds.')
-        r = self._req.post(url, json=json, headers=headers)
+        r = self._req.post(url, json=json)
         logger.debug(r.status_code)
         url = r.json()['url']
         logger.debug(f'file_id:{file_id},expire_sec:{expire_sec},url:{url}')
