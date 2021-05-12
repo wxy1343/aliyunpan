@@ -23,7 +23,8 @@ class Req:
             kwargs.setdefault('timeout', self._timeout)
             kwargs.setdefault('verify', self._verify)
             kwargs['headers'] = kwargs['headers'] if 'headers' in kwargs else {}
-            kwargs['headers']['Authorization'] = GLOBAL_VAR.access_token
+            kwargs['headers']['Authorization'] = kwargs['headers']['Authorization'] if 'Authorization' in kwargs[
+                'headers'] else GLOBAL_VAR.disk.access_token
             kwargs['headers'].update(self._headers)
             r = getattr(self._session, method.lower())(*args, **kwargs)
             return r
