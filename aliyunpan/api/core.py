@@ -25,6 +25,7 @@ class AliyunPan(object):
         self._access_token_gen_ = self._access_token_gen()
         self._drive_id_gen_ = self._drive_id_gen()
         self._chunk_size = 524288
+        GLOBAL_VAR.disk = self
 
     refresh_token = property(lambda self: self._refresh_token,
                              lambda self, value: setattr(self, '_refresh_token', value))
@@ -136,7 +137,6 @@ class AliyunPan(object):
         """
         url = 'https://api.aliyundrive.com/v2/user/get'
         logger.info('Get user information.')
-        self.get_access_token()
         r = self._req.post(url, json={})
         user_info = r.json()
         id_ = user_info['user_id']
@@ -366,7 +366,7 @@ class AliyunPan(object):
         url = 'https://auth.aliyundrive.com/v2/account/token'
         json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
         logger.info(f'Get ACCESS_TOKEN.')
-        r = self._req.post(url, json=json)
+        r = self._req.post(url, json=json, headers={'Authorization': None})
         logger.debug(r.status_code)
         try:
             access_token = r.json()['access_token']
