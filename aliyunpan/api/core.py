@@ -136,6 +136,7 @@ class AliyunPan(object):
         """
         url = 'https://api.aliyundrive.com/v2/user/get'
         logger.info('Get user information.')
+        self.get_access_token()
         r = self._req.post(url, json={})
         user_info = r.json()
         id_ = user_info['user_id']
@@ -146,7 +147,7 @@ class AliyunPan(object):
         user_info = UserInfo(id=id_, nick_name=nick_name, ctime=ctime, phone=phone, drive_id=drive_id)
         logger.debug(user_info)
         self._user_info = user_info
-        drive_id.user_info = user_info
+        GLOBAL_VAR.user_info = user_info
         return user_info
 
     def create_file(self, file_name: str, parent_file_id: str = 'root', file_type: bool = False,
