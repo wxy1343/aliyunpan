@@ -18,6 +18,7 @@ class AliyunPan(object):
 
     def __init__(self, refresh_token: str = None):
         self._req = Req()
+        self._req.disk = self
         self._user_info = None
         self._access_token = None
         self._drive_id = None
@@ -25,7 +26,6 @@ class AliyunPan(object):
         self._access_token_gen_ = self._access_token_gen()
         self._drive_id_gen_ = self._drive_id_gen()
         self._chunk_size = 524288
-        GLOBAL_VAR.disk = self
 
     refresh_token = property(lambda self: self._refresh_token,
                              lambda self, value: setattr(self, '_refresh_token', value))
@@ -53,7 +53,7 @@ class AliyunPan(object):
             }
         }
         logger.info('Logging in.')
-        r = self._req.req(**LOGIN)
+        r = self._req.req(**LOGIN, access_token=False)
         if 'bizExt' in r.json()['content']['data']:
             data = parse_biz_ext(r.json()['content']['data']['bizExt'])
             logger.debug(data)
@@ -366,7 +366,7 @@ class AliyunPan(object):
         url = 'https://auth.aliyundrive.com/v2/account/token'
         json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
         logger.info(f'Get ACCESS_TOKEN.')
-        r = self._req.post(url, json=json, headers={'Authorization': None})
+        r = self._req.post(url, json=json, access_token=False)
         logger.debug(r.status_code)
         try:
             access_token = r.json()['access_token']
