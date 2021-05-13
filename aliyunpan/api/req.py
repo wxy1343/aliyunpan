@@ -12,10 +12,11 @@ class Req:
         self._session = requests.Session()
         self._timeout = 5
         self._verify = False
-        self._host_url = 'https://www.aliyundrive.com'
+        self.disk = None
+        self._host_url = 'https://www.aliyundrive.com/'
         self._headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
-            'Referer': 'https://www.aliyundrive.com/',
+            'Referer': self._host_url,
         }
 
     def _req(self, method, *args, **kwargs):
@@ -23,9 +24,15 @@ class Req:
             kwargs.setdefault('timeout', self._timeout)
             kwargs.setdefault('verify', self._verify)
             kwargs['headers'] = kwargs['headers'] if 'headers' in kwargs else {}
-            kwargs['headers']['Authorization'] = kwargs['headers']['Authorization'] if 'Authorization' in kwargs[
-                'headers'] else GLOBAL_VAR.disk.access_token
             kwargs['headers'].update(self._headers)
+            if 'access_token' in kwargs:
+                if kwargs['access_token']:
+                    kwargs['headers']['Authorization'] = kwargs['access_token']
+                else:
+                    kwargs['headers']['Authorization'] = None
+                del kwargs['access_token']
+            else:
+                kwargs['headers']['Authorization'] = self.disk.access_token if self.disk else GLOBAL_VAR.access_token
             r = getattr(self._session, method.lower())(*args, **kwargs)
             return r
         except requests.exceptions.RequestException:
