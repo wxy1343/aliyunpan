@@ -23,10 +23,15 @@ class Config:
             return yaml.load(f) or {}
 
     def write(self, conf):
+        if not conf:
+            self._config_file.unlink(missing_ok=True)
+            return
         if not self._config_file.is_file():
             if not self._config_file.parent.is_dir():
                 self._config_file.parent.mkdir(parents=True)
             self._config_file.touch()
+        if isinstance(conf, DATA):
+            conf = conf.to_dict()
         with self.config_file.open('w', encoding='utf-8') as f:
             yaml.dump(conf, f)
         return True
