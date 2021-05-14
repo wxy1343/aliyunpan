@@ -24,13 +24,12 @@ class Commander:
         self._config = Config()
         self._task_config = Config('tasks.yaml')
         self._share_link = 'aliyunpan://'
+        self._print = Printer()
         GLOBAL_VAR.tasks = self._task_config.read()
         GLOBAL_VAR.txt = ''
 
     def __del__(self):
-        if GLOBAL_VAR.tasks:
-            for key, value in GLOBAL_VAR.tasks.items():
-                self._task_config.update(key, value)
+        self._task_config.write(GLOBAL_VAR.tasks)
 
     def init(self, config_file='~/.config/aliyunpan.yaml', refresh_token=None, username=None, password=None, depth=3):
         self._path_list.depth = depth
@@ -85,7 +84,7 @@ class Commander:
         file_id_ = self._disk.delete_file(file_id)
         if file_id_ == file_id:
             self._path_list._tree.remove_node(file_id)
-            print(f'[-][rm]{path}')
+            self._print.remove_info(path, status=True)
         return file_id_
 
     def mv(self, path, target_path):
@@ -93,11 +92,11 @@ class Commander:
         _ = self._disk.move_file(self._path_list.get_path_fid(path, update=False),
                                  self._path_list.get_path_fid(target_path, update=False))
         if _ and file_id:
-            print(f'[+][mv]{path} -> {target_path}')
+            self._print.move_info(path, target_path, status=True)
             self._path_list._tree.remove_node(file_id)
             self._path_list.update_path_list(Path(target_path) / path, is_fid=False)
         else:
-            print(f'[-][mv]{path} -> {target_path}')
+            self._print.move_info(path, target_path, status=False)
         return _
 
     def mkdir(self, path):
@@ -119,7 +118,7 @@ class Commander:
             logger.debug(r.json()['message'])
             return False
         if file_id:
-            print(f'[+][mkdir]{path}')
+            self._print.mkdir_info(path, status=True)
             self._path_list._tree.create_node(tag=path.name, identifier=file_id, parent=parent_file_id)
             file_id_list.append((file_id, path))
         return file_id_list
@@ -164,8 +163,9 @@ class Commander:
                                     share_list.append(parse_share_url(line))
                         return self.upload_share(share_list, upload_path, force)
                     else:
-                        file_id = self._disk.upload_file(self._path_list.get_path_fid(upload_path, update=False),
-                                                         path, timeout, retry, force, chunk_size, c)
+                        file_id = self._disk.upload_file(
+                            parent_file_id=self._path_list.get_path_fid(upload_path, update=False), path=path,
+                            upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
                         result_list.append(file_id)
                 elif path.is_dir():
                     if upload_path == 'root':
@@ -173,11 +173,15 @@ class Commander:
                     upload_path = Path(upload_path)
                     upload_file_list = self.upload_dir(path, upload_path)
                     for file in upload_file_list:
-                        result = self._disk.upload_file(self._path_list.get_path_fid(file[0], update=False),
-                                                        file[1], timeout, retry, chunk_size, c)
+                        result = self._disk.upload_file(
+                            parent_file_id=self._path_list.get_path_fid(file[0], update=False), path=file[1],
+                            upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
                         result_list.append(result)
                 else:
                     raise FileNotFoundError
+                for file_hash in GLOBAL_VAR.file_hash_list:
+                    if file_hash in GLOBAL_VAR.tasks and GLOBAL_VAR.tasks[file_hash].upload_time:
+                        del GLOBAL_VAR.tasks[file_hash]
         if len(result_list) == 1:
             result_list = result_list[0]
         return result_list
@@ -218,12 +222,12 @@ class Commander:
             p = PurePosixPath(Path(upload_path / path / share_info.name).as_posix())
             file_list.append((result, p))
             if result:
-                print(f'[+]{p} 快速上传成功')
+                self._print.upload_info(p, status=True, rapid_upload=True)
             else:
-                print(f'[-]{p}')
+                self._print.upload_info(p, status=False)
         return folder_list, file_list
 
-    def download(self, path, save_path, single_file=False, share=False):
+    def download(self, path, save_path=None, single_file=False, share=False):
         if not save_path:
             save_path = Path().cwd()
         save_path = Path(save_path)
@@ -239,7 +243,7 @@ class Commander:
                     p = save_path / path
                     try:
                         p.mkdir(parents=True)
-                        print(f'[+][mkdir]{p}')
+                        self._print.mkdir_info(p, status=True)
                     except FileExistsError:
                         pass
                 for file_id, path in file_list:
@@ -279,7 +283,7 @@ class Commander:
     def download_file(self, path, url):
         try:
             path.parent.mkdir(parents=True)
-            print(f'[+][mkdir]{path.parent}')
+            self._print.mkdir_info(path.parent, status=True)
         except FileExistsError:
             pass
         if path.exists():
@@ -292,7 +296,7 @@ class Commander:
             r = self._req.get(url, headers=headers, stream=True)
             file_size = int(r.headers['Content-Length'])
             if temp_size == file_size and file_size != 0:
-                print(f'[+][download]{path}')
+                self._print.download_info(path, status=True)
                 return True
             elif temp_size > file_size:
                 mode = 'wb'
@@ -314,9 +318,9 @@ class Commander:
                 if show_download_info:
                     print()
         except requests.exceptions.RequestException:
-            print(f'[-][download]{path}')
+            self._print.download_info(path, status=False)
             return False
-        print(f'[+][download]{path}')
+        self._print.download_info(path, status=True)
         return True
 
     def cat(self, path, encoding='utf-8'):
