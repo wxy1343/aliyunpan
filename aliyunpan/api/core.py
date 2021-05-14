@@ -1,14 +1,14 @@
 import sys
 import time
-from pathlib import Path
-
-import func_timeout
 import requests
-
+import func_timeout
+from pathlib import Path
+from collections.abc import Iterable
 from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
+from aliyunpan.common import Printer
 from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException
 
 __all__ = ['AliyunPan']
@@ -26,6 +26,7 @@ class AliyunPan(object):
         self._access_token_gen_ = self._access_token_gen()
         self._drive_id_gen_ = self._drive_id_gen()
         self._chunk_size = 524288
+        self._print = Printer()
 
     refresh_token = property(lambda self: self._refresh_token,
                              lambda self, value: setattr(self, '_refresh_token', value))
@@ -213,21 +214,66 @@ class AliyunPan(object):
         for i in range(count):
             part_info_list.append({"part_number": i + 1})
         json = {"size": file_size, "part_info_list": part_info_list, "content_hash": content_hash}
-        task_info = {}
+        task_info = {'path': str(path.absolute()), 'upload_id': None, 'file_id': None, 'chunk_size': self._chunk_size,
+                     'part_number': None}
+        path_list = []
+        # 已存在任务
         if content_hash in GLOBAL_VAR.tasks:
-            task_info = GLOBAL_VAR.tasks[content_hash]
-            file_id = task_info['file_id']
-            if task_info.upload_time:
-                return file_id
-        print(f'[*][upload]{path}')
-        if c and task_info:
-            path = Path(task_info['path'])
-            upload_id = task_info['upload_id']
-            file_id = task_info['file_id']
-            self._chunk_size = task_info['chunk_size']
-            part_number = task_info['part_number']
-            part_info_list = self.get_upload_url(path, upload_id, file_id, self._chunk_size, part_number)
-        else:
+            # 是否是列表或可迭代对象
+            if isinstance(GLOBAL_VAR.tasks[content_hash].path, Iterable) and not isinstance(
+                    GLOBAL_VAR.tasks[content_hash].path, str):
+                path_list.extend(GLOBAL_VAR.tasks[content_hash].path)
+
+            else:
+                path_list.append(GLOBAL_VAR.tasks[content_hash].path)
+            path_list = [str(Path(path_).absolute()) for path_ in path_list]
+            path_list = list(set(path_list))
+            flag = False
+            # 是否存在上传时间
+            if GLOBAL_VAR.tasks[content_hash].upload_time:
+                for path_ in path_list:
+                    # 是否存在路径
+                    if path.absolute() == Path(path_).absolute():
+                        flag = True
+                        break
+            # 已上传成功
+            if flag:
+                self._print.upload_info(path, status=True, existed=True)
+                path_list.append(str(path.absolute()))
+                path_list = list(set(path_list))
+                GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
+                GLOBAL_VAR.file_hash_list.add(content_hash)
+                return GLOBAL_VAR.tasks[content_hash].file_id
+        is_rapid_upload = False
+        # 断点续传且已存在任务
+        if c and content_hash in GLOBAL_VAR.tasks:
+            upload_id = GLOBAL_VAR.tasks[content_hash].upload_id
+            file_id = GLOBAL_VAR.tasks[content_hash].file_id
+            self._chunk_size = GLOBAL_VAR.tasks[content_hash].chunk_size
+            part_number = GLOBAL_VAR.tasks[content_hash].part_number
+            part_info_list = None
+            # 是否是快速上传
+            if upload_id:
+                # 获取上传链接列表
+                part_info_list = self.get_upload_url(path, upload_id, file_id, self._chunk_size, part_number)
+            else:
+                is_rapid_upload = True
+            if not part_info_list and not is_rapid_upload:
+                # 重新上传
+                if str(path.absolute()) in path_list:
+                    del path_list[str(path.absolute())]
+                GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
+                return self.upload_file(parent_file_id=parent_file_id, path=path, upload_timeout=upload_timeout,
+                                        retry_num=retry_num, force=force, chunk_size=chunk_size, c=c)
+            elif part_info_list == 'AlreadyExist.File':
+                # 已存在
+                self._print.upload_info(path, status=True, existed=True)
+                path_list.append(str(path.absolute()))
+                path_list = list(set(path_list))
+                GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
+                GLOBAL_VAR.file_hash_list.add(content_hash)
+                return GLOBAL_VAR.tasks[content_hash].file_id
+        if not (c and content_hash in GLOBAL_VAR.tasks) or is_rapid_upload:
             # 申请创建文件
             r = self.create_file(file_name=file_name, parent_file_id=parent_file_id, file_type=True, json=json,
                                  force=force)
@@ -235,20 +281,31 @@ class AliyunPan(object):
                 message = r.json()['message']
                 logger.error(message)
                 raise AliyunpanException(message)
+            task_info = {'path': str(path.absolute()), 'upload_id': None,
+                         'file_id': None, 'chunk_size': self._chunk_size,
+                         'part_number': None}
             rapid_upload = r.json()['rapid_upload']
             if rapid_upload:
-                print(f'[+][upload]{path}\t快速上传成功')
+                self._print.upload_info(path, status=True, rapid_upload=True)
                 file_id = r.json()['file_id']
-                GLOBAL_VAR.tasks[content_hash] = {'path': str(path.absolute()), 'upload_time': time.time(),
-                                                  'file_id': file_id, 'chunk_size': self._chunk_size}
+                task_info['file_id'] = file_id
+                task_info['upload_time'] = time.time()
+                GLOBAL_VAR.tasks[content_hash] = task_info
+                GLOBAL_VAR.file_hash_list.add(content_hash)
+                if is_rapid_upload:
+                    path_list.append(str(path.absolute()))
+                    path_list = list(set(path_list))
+                    GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
                 return file_id
             else:
                 upload_id = r.json()['upload_id']
                 file_id = r.json()['file_id']
                 part_info_list = r.json()['part_info_list']
-                GLOBAL_VAR.tasks[content_hash] = {'path': str(path.absolute()),
-                                                  'upload_id': upload_id, 'file_id': file_id,
-                                                  'chunk_size': self._chunk_size, 'part_number': 1}
+                task_info['upload_id'] = upload_id
+                task_info['file_id'] = file_id
+                task_info['part_number'] = 1
+                GLOBAL_VAR.tasks[content_hash] = task_info
+        self._print.upload_info(path)
         logger.debug(f'upload_id: {upload_id}, file_id: {file_id}, part_info_list: {part_info_list}')
         total_time = 0
         upload_info = f'\r上传中... [{"*" * 10}] %0'
@@ -324,6 +381,7 @@ class AliyunPan(object):
             sys.stdout.flush()
             # GLOBAL_VAR.tasks[content_hash] = None
             GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
+            GLOBAL_VAR.file_hash_list.add(content_hash)
             return r.json()['file_id']
         else:
             sys.stdout.write(f'\r[-][upload]{path}\n')
@@ -354,6 +412,8 @@ class AliyunPan(object):
             "upload_id": upload_id,
         }
         r = self._req.post(url, json=json)
+        if 'code' in r.json():
+            return r.json()['code']
         return r.json()['part_info_list'][part_number - 1:]
 
     def get_access_token(self) -> str:
@@ -449,5 +509,6 @@ class AliyunPan(object):
         if r.status_code == 201 and 'rapid_upload' in r.json() and r.json()['rapid_upload']:
             return r.json()['file_id']
         elif 'message' in r.json():
+            logger.debug(r.json())
             print(r.json()["message"])
         return False
