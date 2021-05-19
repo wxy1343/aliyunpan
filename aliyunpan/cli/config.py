@@ -1,7 +1,5 @@
 from pathlib import Path
-
 from ruamel.yaml import YAML
-
 from aliyunpan.common import DATA
 
 __all__ = ['Config']
