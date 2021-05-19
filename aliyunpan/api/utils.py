@@ -3,13 +3,13 @@ import hashlib
 import json
 import logging
 import os
-
 import rsa
 
-__all__ = ['ROOT_DIR', 'logger', 'get_sha1', 'StrOfSize', 'encrypt', 'parse_biz_ext']
+import sys
 
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(os.path.dirname(ROOT_DIR))
+__all__ = ['ROOT_DIR', 'logger', 'get_sha1', 'str_of_size', 'encrypt', 'parse_biz_ext']
+
+ROOT_DIR = os.path.dirname(os.path.realpath(sys.argv[0]))
 LOG_LEVEL = logging.INFO
 logger = logging.getLogger('aliyunpan')
 log_file = ROOT_DIR + os.sep + 'aliyunpan.log'
@@ -39,21 +39,19 @@ def get_sha1(path, split_size):
     return content_hash
 
 
-def StrOfSize(size):
-    def strofsize(integer, remainder, level):
-        if integer >= 1024:
-            remainder = integer % 1024
-            integer //= 1024
-            level += 1
-            return strofsize(integer, remainder, level)
-        else:
-            return integer, remainder, level
-
+def str_of_size(size, decimal=3, tuple_=False):
     units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
-    integer, remainder, level = strofsize(size, 0, 0)
+    integer = int(size)
+    level = 0
+    while integer >= 1024:
+        integer //= 1024
+        level += 1
     if level + 1 > len(units):
         level = -1
-    return '{}.{:>03d}{}'.format(integer, remainder, units[level])
+    size = round(size / (1024 ** level), decimal) if decimal else size
+    if tuple_:
+        return size, units[level]
+    return f'{size}{units[level]}'
 
 
 # RSA encrypt
