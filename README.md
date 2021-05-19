@@ -4,7 +4,7 @@
 
 阿里云盘cli  
 环境要求： python 3.7 通过测试  
-低版本环境运行报错参考[issue9](https://github.com/wxy1343/aliyunpan/issues/9)
+~~低版本环境运行报错参考~~[~~issue9~~](https://github.com/wxy1343/aliyunpan/issues/9)
 
 ## 获取refresh_token
 
