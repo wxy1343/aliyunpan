@@ -1,9 +1,5 @@
-import math
 import os
-import sys
-
 import requests
-
 from aliyunpan.api.core import AliyunPan
 from aliyunpan.api.models import *
 from aliyunpan.api.req import *
@@ -22,7 +18,7 @@ class Commander:
         self._path_list = PathList(self._disk)
         self._req = Req()
         self._config = Config()
-        self._task_config = Config('tasks.yaml')
+        self._task_config = Config(ROOT_DIR / Path('tasks.yaml'))
         self._share_link = 'aliyunpan://'
         self._print = Printer()
         GLOBAL_VAR.tasks = self._task_config.read()
@@ -68,7 +64,7 @@ class Commander:
         for i in self._path_list.get_path_list(path, update=False):
             if l:
                 if i.type:
-                    print(StrOfSize(i.size), time.strftime('%d %b %H:%M', i.ctime), i.id, i.name)
+                    print(str_of_size(i.size), time.strftime('%d %b %H:%M', i.ctime), i.id, i.name)
                 else:
                     print('-', time.strftime('%d %b %H:%M', i.ctime), i.id, i.name)
             else:
@@ -84,7 +80,7 @@ class Commander:
         file_id_ = self._disk.delete_file(file_id)
         if file_id_ == file_id:
             self._path_list._tree.remove_node(file_id)
-            self._print.remove_info(path, status=True)
+            self._print.remove_info(path, status=False)
         return file_id_
 
     def mv(self, path, target_path):
@@ -163,9 +159,13 @@ class Commander:
                                     share_list.append(parse_share_url(line))
                         return self.upload_share(share_list, upload_path, force)
                     else:
-                        file_id = self._disk.upload_file(
-                            parent_file_id=self._path_list.get_path_fid(upload_path, update=False), path=path,
-                            upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
+                        try:
+                            file_id = self._disk.upload_file(
+                                parent_file_id=self._path_list.get_path_fid(upload_path, update=False), path=path,
+                                upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
+                        except KeyboardInterrupt:
+                            self.__del__()
+                            raise
                         result_list.append(file_id)
                 elif path.is_dir():
                     if upload_path == 'root':
@@ -173,9 +173,13 @@ class Commander:
                     upload_path = Path(upload_path)
                     upload_file_list = self.upload_dir(path, upload_path)
                     for file in upload_file_list:
-                        result = self._disk.upload_file(
-                            parent_file_id=self._path_list.get_path_fid(file[0], update=False), path=file[1],
-                            upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
+                        try:
+                            result = self._disk.upload_file(
+                                parent_file_id=self._path_list.get_path_fid(file[0], update=False), path=file[1],
+                                upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
+                        except KeyboardInterrupt:
+                            self.__del__()
+                            raise
                         result_list.append(result)
                 else:
                     raise FileNotFoundError
@@ -275,7 +279,7 @@ class Commander:
             if file_node.type:
                 if single_file:
                     p = save_path / p.name
-                print(f'[*][download]{p}')
+                self._print.download_info(p)
                 self.download_file(p, file_node.download_url)
             else:
                 self.download(self._path_list.get_fid_list(file_node.id), save_path / p.name)
@@ -303,24 +307,23 @@ class Commander:
                 temp_size = 0
             else:
                 mode = 'ab'
-            download_info = f'\r下载中... [{"*" * 10}] %0'
-            show_download_info = download_info and file_size >= 1024 * 1024
+            download_bar = DownloadBar(size=file_size)
+            download_bar.update(refresh_line=False)
+            total_time = 0
             with path.open(mode) as f:
                 for chunk in r.iter_content(chunk_size=1024):
-                    if show_download_info:
-                        sys.stdout.write(download_info)
+                    k = temp_size / file_size
+                    download_bar.update(ratio=k, refresh_line=True)
                     if chunk:
                         temp_size += len(chunk)
                         f.write(chunk)
-                    total_time = time.time() - start_time
-                    k = temp_size / file_size
-                    download_info = f'\r下载中... [{"=" * int(k * 10)}{"*" * int((1 - k) * 10)}] %{math.ceil(k * 1000) / 10} {round(temp_size / total_time / 1024 / 1024, 2)}MB/s'
-                if show_download_info:
-                    print()
+                    t = time.time() - start_time
+                    total_time += t
         except requests.exceptions.RequestException:
             self._print.download_info(path, status=False)
             return False
-        self._print.download_info(path, status=True)
+        self._print.download_info(path, status=True, t=total_time, average_speed=file_size / total_time,
+                                  refresh_line=True)
         return True
 
     def cat(self, path, encoding='utf-8'):

@@ -8,7 +8,6 @@ from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
-from aliyunpan.common import Printer
 from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException
 
 __all__ = ['AliyunPan']
@@ -308,8 +307,8 @@ class AliyunPan(object):
         self._print.upload_info(path)
         logger.debug(f'upload_id: {upload_id}, file_id: {file_id}, part_info_list: {part_info_list}')
         total_time = 0
-        upload_info = f'\r上传中... [{"*" * 10}] %0'
-        show_upload_info = upload_info and file_size >= 1024 * 1024
+        upload_bar = UploadBar(size=file_size)
+        upload_bar.update(refresh_line=False)
         for i in part_info_list:
             part_number, upload_url = i['part_number'], i['upload_url']
             GLOBAL_VAR.tasks[content_hash].part_number = part_number
@@ -322,9 +321,7 @@ class AliyunPan(object):
             retry_count = 0
             start_time = time.time()
             while True:
-                if show_upload_info:
-                    sys.stdout.write(upload_info)
-                    sys.stdout.flush()
+                upload_bar.update(refresh_line=True)
                 logger.debug(
                     f'(upload_id={upload_id}, file_id={file_id}, size={size}): Upload part of {part_number} to {upload_url}.')
                 try:
@@ -334,12 +331,10 @@ class AliyunPan(object):
                 except func_timeout.exceptions.FunctionTimedOut:
                     logger.warn('Upload timeout.')
                     if retry_count is retry_num:
-                        sys.stdout.write(f'\rError:上传超时{retry_num}次，即将重新上传'.ljust(30))
-                        sys.stdout.flush()
+                        self._print.error_info(f'上传超时{retry_num}次，即将重新上传', refresh_line=True)
                         time.sleep(1)
                         return self.upload_file(parent_file_id, path, upload_timeout)
-                    sys.stdout.write(f'\rError:上传超时'.ljust(30))
-                    sys.stdout.flush()
+                    self._print.error_info('上传超时', refresh_line=True)
                     retry_count += 1
                     time.sleep(1)
                 except KeyboardInterrupt:
@@ -347,24 +342,14 @@ class AliyunPan(object):
                 except:
                     logger.error(sys.exc_info())
                     exc_type, exc_value, exc_traceback = sys.exc_info()
-                    sys.stdout.write(f'\rError:{exc_type.__name__}'.ljust(30))
-                    sys.stdout.flush()
+                    self._print.error_info(exc_type.__name__, refresh_line=True)
                     time.sleep(1)
-                # 重试等待时间
-                n = 3
-                while n:
-                    sys.stdout.write(f'\r{n}秒后重试'.ljust(30))
-                    sys.stdout.flush()
-                    n -= 1
-                    time.sleep(1)
-                sys.stdout.write('\r')
+                self._print.wait_info(refresh_line=True)
             end_time = time.time()
             t = end_time - start_time
             total_time += t
             k = part_number / part_info_list[-1]['part_number']
-            upload_info = '\r上传中{:<3s} [{}{}] {:.2%} {:.2f}MB/s'.format(('.' * (part_number % 4)),
-                                                                        '=' * int(k * 10), '*' * (10 - int(k * 10)), k,
-                                                                        size / 1024 / 1024 / t)
+            upload_bar.update(ratio=k, refresh_line=True)
         # 上传完成保存文件
         url = 'https://api.aliyundrive.com/v2/file/complete'
         json = {
@@ -376,16 +361,13 @@ class AliyunPan(object):
         r = self._req.post(url, json=json)
         if r.status_code == 200:
             total_time = int(total_time * 100) / 100
-            sys.stdout.write(
-                f'\r[+][upload]{path}\t上传成功,耗时{int(total_time * 100) / 100}秒,平均速度{round(file_size / 1024 / 1024 / total_time)}MB/s\n')
-            sys.stdout.flush()
-            # GLOBAL_VAR.tasks[content_hash] = None
+            self._print.upload_info(path, status=True, t=total_time, average_speed=file_size / total_time,
+                                    refresh_line=True)
             GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
             GLOBAL_VAR.file_hash_list.add(content_hash)
             return r.json()['file_id']
         else:
-            sys.stdout.write(f'\r[-][upload]{path}\n')
-            sys.stdout.flush()
+            self._print.upload_info(path, status=False, refresh_line=True)
             return False
 
     def get_upload_url(self, path: str, upload_id: str, file_id: str, chunk_size: int, part_number: int = 1) -> list:
