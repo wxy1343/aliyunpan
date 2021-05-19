@@ -2,11 +2,10 @@ import sys
 import time
 from abc import abstractmethod
 from threading import RLock
-from colorama import Fore, init
+from colorama import Fore, Style, Back
 from aliyunpan.api.utils import str_of_size
 
 __all__ = ['DATA', 'GLOBAL_VAR', 'Printer', 'Bar', 'FileBar', 'UploadBar', 'DownloadBar']
-init(autoreset=True)
 
 
 class DATA(dict):
@@ -68,7 +67,7 @@ class Info:
     def __str__(self):
         info = self.info
         if self.color:
-            info = self.color + info
+            info = Style.BRIGHT + Back.BLACK + self.color + info + Style.RESET_ALL
         if self.refresh_line:
             info = '\r' + info
         return info
