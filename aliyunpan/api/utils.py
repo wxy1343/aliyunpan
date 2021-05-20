@@ -36,7 +36,7 @@ def get_sha1(path, split_size):
         count = 0
         while True:
             chunk = f.read(split_size)
-            k = ((count * split_size) + len(chunk)) / file_size
+            k = ((count * split_size) + len(chunk)) / file_size if file_size else 0
             hash_bar.update(ratio=k, refresh_line=True)
             if not chunk:
                 break
