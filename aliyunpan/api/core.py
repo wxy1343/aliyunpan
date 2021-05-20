@@ -302,10 +302,10 @@ class AliyunPan(object):
                 task_info['file_id'] = file_id
                 task_info['part_number'] = 1
                 GLOBAL_VAR.tasks[content_hash] = task_info
-        self._print.upload_info(path)
-        logger.debug(f'upload_id: {upload_id}, file_id: {file_id}, part_info_list: {part_info_list}')
         upload_bar = UploadBar(size=file_size)
+        upload_bar.upload_info(path)
         upload_bar.update(refresh_line=False)
+        logger.debug(f'upload_id: {upload_id}, file_id: {file_id}, part_info_list: {part_info_list}')
         for i in part_info_list:
             part_number, upload_url = i['part_number'], i['upload_url']
             GLOBAL_VAR.tasks[content_hash].part_number = part_number
@@ -329,7 +329,8 @@ class AliyunPan(object):
                     if retry_count is retry_num:
                         self._print.error_info(f'上传超时{retry_num}次，即将重新上传', refresh_line=True)
                         time.sleep(1)
-                        return self.upload_file(parent_file_id, path, upload_timeout)
+                        return self.upload_file(parent_file_id=parent_file_id, path=path, upload_timeout=upload_timeout,
+                                                retry_num=retry_num, force=force, chunk_size=chunk_size, c=c)
                     self._print.error_info('上传超时', refresh_line=True)
                     retry_count += 1
                     time.sleep(1)
@@ -353,13 +354,13 @@ class AliyunPan(object):
         }
         r = self._req.post(url, json=json)
         if r.status_code == 200:
-            self._print.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
+            upload_bar.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
                                     refresh_line=True)
             GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
             GLOBAL_VAR.file_hash_list.add(content_hash)
             return r.json()['file_id']
         else:
-            self._print.upload_info(path, status=False, refresh_line=True)
+            upload_bar.upload_info(path, status=False, refresh_line=True)
             return False
 
     def get_upload_url(self, path: str, upload_id: str, file_id: str, chunk_size: int, part_number: int = 1) -> list:

@@ -6,7 +6,7 @@ from threading import RLock
 from colorama import Fore, Style, Back
 from aliyunpan.api.utils import str_of_size
 
-__all__ = ['DATA', 'GLOBAL_VAR', 'Printer', 'Bar', 'FileBar', 'UploadBar', 'DownloadBar']
+__all__ = ['DATA', 'GLOBAL_VAR', 'Printer', 'Bar', 'FileBar', 'UploadBar', 'DownloadBar', 'HashBar']
 os.system('')
 
 
@@ -58,7 +58,7 @@ GLOBAL_VAR.file_hash_list = set()
 
 
 class Info:
-    def __init__(self, info=None, error=False, refresh_line=False, color=None):
+    def __init__(self, info='', error=False, refresh_line=False, color=None):
         self.info = info
         self.error = error
         self.color = color
@@ -170,6 +170,7 @@ class Printer(OutPut):
         self._move_title = 'mv'
         self._link_info = ' -> '
         self._remove_title = 'rm'
+        self._hash_title = 'hash'
         self._time_info = 'time:{:.2f}s'
         self.avg_info = 'avg:{:.2f}{}/s'
         self._error_info = 'Error:{}'
@@ -179,8 +180,10 @@ class Printer(OutPut):
         self._wait_color = Fore.MAGENTA
         self._error_color = Fore.RED
         self._print = OutPutSingleton().output
+        self._hash_size = 1024 ** 3
+        self._output = True
 
-    output = property(lambda self: self._print, lambda self, value: self._print.send(value))
+    output = property(lambda self: self._print, lambda self, value: self._print.send(value) if self._output else None)
 
     def get_info(self, status, path, *args, target_path=None, refresh_line=False):
         path_info = str(path) + self._link_info + str(target_path) if target_path else str(path)
@@ -238,6 +241,13 @@ class Printer(OutPut):
         info.color = self._remove_color or info.color
         self.output = info
 
+    def hash_info(self, path, status=None, size=None, *args, **kwargs):
+        info = self.get_info(status, path, self._hash_title, *args, **kwargs)
+        self.output = info
+
+    def refresh_line(self):
+        self.output = Info(refresh_line=True)
+
 
 class Bar(Printer):
     def __init__(self, title=None):
@@ -249,7 +259,6 @@ class Bar(Printer):
         self._total_time = 0
         self._average_speed = 0
         self._count = 0
-        self._output = True
 
     time = property(lambda self: self._total_time)
     average_speed = property(lambda self: self._average_speed)
@@ -258,25 +267,25 @@ class Bar(Printer):
         return (ratio - self._ratio) / t if t else 0
 
     def update(self, ratio=0.0, refresh_line=False):
-        if not self._output:
-            return
         self._count += 1
         self._total_time = time.time() - self._start_time
         self._ratio = ratio or self._ratio
         self._average_speed = self._get_average_speed(self._ratio, self._total_time)
-        self.output = Info(
-            self._upload_info.format(self._title, '.' * (4 - (self._count % 3 or 3)), '=' * int(self._ratio * 10),
-                                     '*' * (10 - int(self._ratio * 10)), self._ratio,
-                                     *str_of_size(self._average_speed, tuple_=True)), refresh_line=refresh_line,
-            color=Fore.LIGHTMAGENTA_EX)
+        if self._output:
+            self.output = Info(
+                self._upload_info.format(self._title, '.' * (4 - (self._count % 3 or 3)), '=' * int(self._ratio * 10),
+                                         '*' * (10 - int(self._ratio * 10)), self._ratio,
+                                         *str_of_size(self._average_speed, tuple_=True)), refresh_line=refresh_line,
+                color=Fore.LIGHTMAGENTA_EX)
 
 
 class FileBar(Bar):
     def __init__(self, title=None, size=0):
         super(FileBar, self).__init__()
+        self._file_size = 1024 * 1024
         self._title = title or self.__class__.__name__
         self._size = size
-        if self._size < 1024 * 1024:
+        if self._size < self._file_size:
             self._output = False
 
     def _get_average_speed(self, ratio, t):
@@ -293,3 +302,24 @@ class DownloadBar(FileBar):
     def __init__(self, size):
         super(DownloadBar, self).__init__(size=size)
         self._title = self._download_title
+
+
+class HashBar(FileBar):
+    def __init__(self, size):
+        super(HashBar, self).__init__(size=size)
+        self._title = self._hash_title
+        self._size = size
+        self._time_out = 5
+        if self._size < self._hash_size:
+            self._output = False
+
+    def update(self, *args, **kwargs):
+        if self.time > self._time_out:
+            self._output = True
+        super(HashBar, self).update(*args, **kwargs)
+
+    def refresh_line(self):
+        super(HashBar, self).refresh_line()
+
+    def hash_info(self, *args, **kwargs):
+        super(HashBar, self).hash_info(*args, **kwargs)

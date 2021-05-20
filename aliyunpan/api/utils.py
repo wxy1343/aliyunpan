@@ -3,8 +3,9 @@ import hashlib
 import json
 import logging
 import os
-import rsa
+import time
 
+import rsa
 import sys
 
 __all__ = ['ROOT_DIR', 'logger', 'get_sha1', 'str_of_size', 'encrypt', 'parse_biz_ext']
@@ -25,17 +26,26 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 def get_sha1(path, split_size):
     logger.info(f'Calculate sha1 of file {path}.')
+    file_size = os.path.getsize(path)
+    from aliyunpan.common import HashBar
+    hash_bar = HashBar(size=file_size)
+    hash_bar.hash_info(path, size=file_size)
+    hash_bar.update(refresh_line=False)
     with open(path, 'rb') as f:
         sha1 = hashlib.sha1()
         count = 0
         while True:
             chunk = f.read(split_size)
+            k = ((count * split_size) + len(chunk)) / file_size
+            hash_bar.update(ratio=k, refresh_line=True)
             if not chunk:
                 break
             count += 1
             sha1.update(chunk)
         content_hash = sha1.hexdigest()
     logger.info(f'The SHA1 of file {path} is {content_hash}.')
+    hash_bar.refresh_line()
+    hash_bar.hash_info(path, status=True, size=file_size, refresh_line=True)
     return content_hash
 
 
