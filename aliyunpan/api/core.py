@@ -213,8 +213,6 @@ class AliyunPan(object):
         for i in range(count):
             part_info_list.append({"part_number": i + 1})
         json = {"size": file_size, "part_info_list": part_info_list, "content_hash": content_hash}
-        task_info = {'path': str(path.absolute()), 'upload_id': None, 'file_id': None, 'chunk_size': self._chunk_size,
-                     'part_number': None}
         path_list = []
         # 已存在任务
         if content_hash in GLOBAL_VAR.tasks:
@@ -306,7 +304,6 @@ class AliyunPan(object):
                 GLOBAL_VAR.tasks[content_hash] = task_info
         self._print.upload_info(path)
         logger.debug(f'upload_id: {upload_id}, file_id: {file_id}, part_info_list: {part_info_list}')
-        total_time = 0
         upload_bar = UploadBar(size=file_size)
         upload_bar.update(refresh_line=False)
         for i in part_info_list:
@@ -319,7 +316,6 @@ class AliyunPan(object):
                 break
             size = len(chunk)
             retry_count = 0
-            start_time = time.time()
             while True:
                 upload_bar.update(refresh_line=True)
                 logger.debug(
@@ -345,9 +341,6 @@ class AliyunPan(object):
                     self._print.error_info(exc_type.__name__, refresh_line=True)
                     time.sleep(1)
                 self._print.wait_info(refresh_line=True)
-            end_time = time.time()
-            t = end_time - start_time
-            total_time += t
             k = part_number / part_info_list[-1]['part_number']
             upload_bar.update(ratio=k, refresh_line=True)
         # 上传完成保存文件
@@ -360,8 +353,7 @@ class AliyunPan(object):
         }
         r = self._req.post(url, json=json)
         if r.status_code == 200:
-            total_time = int(total_time * 100) / 100
-            self._print.upload_info(path, status=True, t=total_time, average_speed=file_size / total_time,
+            self._print.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
                                     refresh_line=True)
             GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
             GLOBAL_VAR.file_hash_list.add(content_hash)

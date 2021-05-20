@@ -295,7 +295,6 @@ class Commander:
         else:
             temp_size = 0
         headers = {'Range': 'bytes=%d-' % temp_size}
-        start_time = time.time()
         try:
             r = self._req.get(url, headers=headers, stream=True)
             file_size = int(r.headers['Content-Length'])
@@ -309,7 +308,6 @@ class Commander:
                 mode = 'ab'
             download_bar = DownloadBar(size=file_size)
             download_bar.update(refresh_line=False)
-            total_time = 0
             with path.open(mode) as f:
                 for chunk in r.iter_content(chunk_size=1024):
                     k = temp_size / file_size
@@ -317,12 +315,10 @@ class Commander:
                     if chunk:
                         temp_size += len(chunk)
                         f.write(chunk)
-                    t = time.time() - start_time
-                    total_time += t
         except requests.exceptions.RequestException:
             self._print.download_info(path, status=False)
             return False
-        self._print.download_info(path, status=True, t=total_time, average_speed=file_size / total_time,
+        self._print.download_info(path, status=True, t=download_bar.time, average_speed=download_bar.average_speed,
                                   refresh_line=True)
         return True
 

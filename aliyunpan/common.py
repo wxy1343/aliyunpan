@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 from abc import abstractmethod
@@ -6,6 +7,7 @@ from colorama import Fore, Style, Back
 from aliyunpan.api.utils import str_of_size
 
 __all__ = ['DATA', 'GLOBAL_VAR', 'Printer', 'Bar', 'FileBar', 'UploadBar', 'DownloadBar']
+os.system('')
 
 
 class DATA(dict):
@@ -245,8 +247,12 @@ class Bar(Printer):
         self._ratio = 0.0
         self._start_time = time.time()
         self._total_time = 0
+        self._average_speed = 0
         self._count = 0
         self._output = True
+
+    time = property(lambda self: self._total_time)
+    average_speed = property(lambda self: self._average_speed)
 
     def _get_average_speed(self, ratio, t):
         return (ratio - self._ratio) / t if t else 0
@@ -255,14 +261,13 @@ class Bar(Printer):
         if not self._output:
             return
         self._count += 1
-        t = time.time() - self._start_time
-        self._total_time += t
+        self._total_time = time.time() - self._start_time
         self._ratio = ratio or self._ratio
-        average_speed = self._get_average_speed(self._ratio, t)
+        self._average_speed = self._get_average_speed(self._ratio, self._total_time)
         self.output = Info(
-            self._upload_info.format(self._title, '.' * (self._count % 3 or 3), '=' * int(self._ratio * 10),
+            self._upload_info.format(self._title, '.' * (4 - (self._count % 3 or 3)), '=' * int(self._ratio * 10),
                                      '*' * (10 - int(self._ratio * 10)), self._ratio,
-                                     *str_of_size(average_speed, tuple_=True)), refresh_line=refresh_line,
+                                     *str_of_size(self._average_speed, tuple_=True)), refresh_line=refresh_line,
             color=Fore.LIGHTMAGENTA_EX)
 
 
