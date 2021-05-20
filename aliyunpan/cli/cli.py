@@ -139,10 +139,18 @@ class Commander:
                         if not self._path_list.get_path_fid(share_info.name, update=False):
                             self.upload_share(share_info)
                             self._path_list.update_path_list(depth=0)
-                        for line in self.cat(share_info.name).split('\n'):
+                        if share_info.path == 'root':
+                            path_ = share_info.name
+                        else:
+                            path_ = share_info.path / share_info.name
+                        for line in self.cat(path_).split('\n'):
                             if line.startswith(self._share_link):
                                 share_list.append(parse_share_url(line))
-                        self.rm(share_info.name)
+                        self.rm(path_)
+                        if upload_path == 'root':
+                            upload_path = share_info.path
+                        else:
+                            upload_path /= share_info.path
                     else:
                         share_list = parse_share_url(path)
                     return self.upload_share(share_list, upload_path, force)
