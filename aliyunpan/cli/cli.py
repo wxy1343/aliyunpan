@@ -183,9 +183,17 @@ class Commander:
                         result_list.append(result)
                 else:
                     raise FileNotFoundError
-                for file_hash in GLOBAL_VAR.file_hash_list:
+                for file_hash, path in GLOBAL_VAR.file_set:
                     if file_hash in GLOBAL_VAR.tasks and GLOBAL_VAR.tasks[file_hash].upload_time:
-                        del GLOBAL_VAR.tasks[file_hash]
+                        if isinstance(GLOBAL_VAR.tasks[file_hash].path, str):
+                            del GLOBAL_VAR.tasks[file_hash]
+                        else:
+                            try:
+                                GLOBAL_VAR.tasks[file_hash].path.remove(path)
+                            except ValueError:
+                                pass
+                            if not GLOBAL_VAR.tasks[file_hash].path:
+                                del GLOBAL_VAR.tasks[file_hash]
         if len(result_list) == 1:
             result_list = result_list[0]
         return result_list

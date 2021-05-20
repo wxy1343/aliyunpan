@@ -54,7 +54,7 @@ class DATA(dict):
 
 GLOBAL_VAR = DATA()
 GLOBAL_VAR.tasks = {}
-GLOBAL_VAR.file_hash_list = set()
+GLOBAL_VAR.file_set = set()
 
 
 class Info:

@@ -214,63 +214,57 @@ class AliyunPan(object):
             part_info_list.append({"part_number": i + 1})
         json = {"size": file_size, "part_info_list": part_info_list, "content_hash": content_hash}
         path_list = []
+        existed = False
         # 已存在任务
         if content_hash in GLOBAL_VAR.tasks:
             # 是否是列表或可迭代对象
             if isinstance(GLOBAL_VAR.tasks[content_hash].path, Iterable) and not isinstance(
                     GLOBAL_VAR.tasks[content_hash].path, str):
                 path_list.extend(GLOBAL_VAR.tasks[content_hash].path)
-
             else:
                 path_list.append(GLOBAL_VAR.tasks[content_hash].path)
-            path_list = [str(Path(path_).absolute()) for path_ in path_list]
-            path_list = list(set(path_list))
+            path_list = list(set([str(Path(path_).absolute()) for path_ in path_list]))
             flag = False
-            # 是否存在上传时间
-            if GLOBAL_VAR.tasks[content_hash].upload_time:
+            # 云盘是否存在该文件
+            if GLOBAL_VAR.tasks[content_hash].upload_time and path_list:
+                existed = True
                 for path_ in path_list:
                     # 是否存在路径
                     if path.absolute() == Path(path_).absolute():
                         flag = True
                         break
-            # 已上传成功
-            if flag:
+            # 云盘存在该文件且存在路径且断点续传
+            if existed and flag and c:
+                # 已存在跳过上传
                 self._print.upload_info(path, status=True, existed=True)
-                path_list.append(str(path.absolute()))
-                path_list = list(set(path_list))
                 GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
-                GLOBAL_VAR.file_hash_list.add(content_hash)
+                GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
                 return GLOBAL_VAR.tasks[content_hash].file_id
-        is_rapid_upload = False
-        # 断点续传且已存在任务
-        if c and content_hash in GLOBAL_VAR.tasks:
+        # 断点续传且已存在任务且云盘不存在该文件
+        if c and content_hash in GLOBAL_VAR.tasks and not existed:
             upload_id = GLOBAL_VAR.tasks[content_hash].upload_id
             file_id = GLOBAL_VAR.tasks[content_hash].file_id
             self._chunk_size = GLOBAL_VAR.tasks[content_hash].chunk_size
             part_number = GLOBAL_VAR.tasks[content_hash].part_number
-            part_info_list = None
-            # 是否是快速上传
-            if upload_id:
-                # 获取上传链接列表
-                part_info_list = self.get_upload_url(path, upload_id, file_id, self._chunk_size, part_number)
-            else:
-                is_rapid_upload = True
-            if not part_info_list and not is_rapid_upload:
+            # 获取上传链接列表
+            part_info_list = self.get_upload_url(path, upload_id, file_id, self._chunk_size, part_number)
+            if not part_info_list:
                 # 重新上传
                 if str(path.absolute()) in path_list:
+                    # 删除未上传成功的任务
                     del path_list[str(path.absolute())]
                 GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
                 return self.upload_file(parent_file_id=parent_file_id, path=path, upload_timeout=upload_timeout,
                                         retry_num=retry_num, force=force, chunk_size=chunk_size, c=c)
             elif part_info_list == 'AlreadyExist.File':
-                # 已存在
+                # 漏网之鱼
                 self._print.upload_info(path, status=True, existed=True)
                 path_list.append(str(path.absolute()))
                 path_list = list(set(path_list))
                 GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
-                GLOBAL_VAR.file_hash_list.add(content_hash)
+                GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
                 return GLOBAL_VAR.tasks[content_hash].file_id
-        if not (c and content_hash in GLOBAL_VAR.tasks) or is_rapid_upload:
+        else:
             # 申请创建文件
             r = self.create_file(file_name=file_name, parent_file_id=parent_file_id, file_type=True, json=json,
                                  force=force)
@@ -282,14 +276,16 @@ class AliyunPan(object):
                          'file_id': None, 'chunk_size': self._chunk_size,
                          'part_number': None}
             rapid_upload = r.json()['rapid_upload']
+            # 快速上传成功
             if rapid_upload:
                 self._print.upload_info(path, status=True, rapid_upload=True)
                 file_id = r.json()['file_id']
                 task_info['file_id'] = file_id
                 task_info['upload_time'] = time.time()
                 GLOBAL_VAR.tasks[content_hash] = task_info
-                GLOBAL_VAR.file_hash_list.add(content_hash)
-                if is_rapid_upload:
+                GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
+                if existed:
+                    # 同hash不同路径
                     path_list.append(str(path.absolute()))
                     path_list = list(set(path_list))
                     GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
@@ -309,6 +305,7 @@ class AliyunPan(object):
         for i in part_info_list:
             part_number, upload_url = i['part_number'], i['upload_url']
             GLOBAL_VAR.tasks[content_hash].part_number = part_number
+            # 分块读取
             with path.open('rb') as f:
                 f.seek((part_number - 1) * self._chunk_size)
                 chunk = f.read(self._chunk_size)
@@ -357,7 +354,7 @@ class AliyunPan(object):
             upload_bar.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
                                    refresh_line=True)
             GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
-            GLOBAL_VAR.file_hash_list.add(content_hash)
+            GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
             return r.json()['file_id']
         else:
             upload_bar.upload_info(path, status=False, refresh_line=True)
