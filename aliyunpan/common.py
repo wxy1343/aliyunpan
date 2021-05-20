@@ -256,21 +256,23 @@ class Bar(Printer):
         self._upload_info = '{}{:<3s} [{}{}] {:.2%} {:.2f}{}/s'
         self._ratio = 0.0
         self._start_time = time.time()
-        self._total_time = 0
+        self._time = time.time()
         self._average_speed = 0
         self._count = 0
 
-    time = property(lambda self: self._total_time)
+    time = property(lambda self: time.time() - self._start_time)
     average_speed = property(lambda self: self._average_speed)
 
     def _get_average_speed(self, ratio, t):
         return (ratio - self._ratio) / t if t else 0
 
-    def update(self, ratio=0.0, refresh_line=False):
+    def update(self, ratio=None, refresh_line=False):
         self._count += 1
-        self._total_time = time.time() - self._start_time
-        self._ratio = ratio or self._ratio
-        self._average_speed = self._get_average_speed(self._ratio, self._total_time)
+        if ratio is not None:
+            t = time.time() - self._time
+            self._time = time.time()
+            self._average_speed = self._get_average_speed(ratio, t)
+            self._ratio = ratio
         if self._output:
             self.output = Info(
                 self._upload_info.format(self._title, '.' * (4 - (self._count % 3 or 3)), '=' * int(self._ratio * 10),
@@ -289,7 +291,7 @@ class FileBar(Bar):
             self._output = False
 
     def _get_average_speed(self, ratio, t):
-        return ratio * self._size / t if t else 0
+        return self._size * super(FileBar, self)._get_average_speed(ratio, t)
 
 
 class UploadBar(FileBar):

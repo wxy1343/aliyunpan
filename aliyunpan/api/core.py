@@ -355,7 +355,7 @@ class AliyunPan(object):
         r = self._req.post(url, json=json)
         if r.status_code == 200:
             upload_bar.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
-                                    refresh_line=True)
+                                   refresh_line=True)
             GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
             GLOBAL_VAR.file_hash_list.add(content_hash)
             return r.json()['file_id']
