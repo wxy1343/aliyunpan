@@ -38,7 +38,7 @@ class PathList:
                                      update_time=time.strptime(i['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
                                      hidden=i['hidden'])
             if self._tree.get_node(file_info.id):
-                self._tree.update_node(file_id, data=file_info)
+                self._tree.update_node(file_info.id, data=file_info)
             else:
                 self._tree.create_node(tag=file_info.name, identifier=file_info.id, data=file_info, parent=file_id)
             if not file_info.type and depth:
