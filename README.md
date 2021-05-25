@@ -40,6 +40,7 @@ echo "password: 'xxxxx'"  >>  ~/.config/aliyunpan.yaml
 |ls (dir,l,list)     |列目录                         |
 |mv (move)           |移动文件/文件夹                  |
 |rm (del,delete)     |删除文件/文件夹                  |
+|rename (r)          |重命名文件/文件夹                |
 |tree (show,t)       |查看文件树                      |
 |upload (u)          |上传文件/文件夹                  |
 |share (s)           |分享文件                        |

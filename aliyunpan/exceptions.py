@@ -32,3 +32,7 @@ class ConfigurationFileNotFoundError(ConfigurationFileError):
 
 class InvalidConfiguration(ConfigurationFileError):
     """无效的配置文件"""
+
+
+class AliyunpanCode(object):
+    existed = 'AlreadyExist.File'

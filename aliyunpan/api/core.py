@@ -8,7 +8,7 @@ from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
-from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException
+from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode
 
 __all__ = ['AliyunPan']
 
@@ -121,7 +121,6 @@ class AliyunPan(object):
                 "resource": "file"}
         logger.info(f'Move files {file_id} to {parent_file_id}')
         r = self._req.post(url, json=json)
-
         logger.debug(r.status_code)
         if r.status_code == 200:
             if 'message' in r.json()['responses'][0]['body']:
@@ -129,6 +128,23 @@ class AliyunPan(object):
                 return False
             return r.json()['responses'][0]['id']
         return False
+
+    def update_file(self, file_id: str, name: str):
+        """
+        重命名文件
+        :param file_id:
+        :param name:
+        :return:
+        """
+        url = 'https://api.aliyundrive.com/v2/file/update'
+        json = {"drive_id": self.drive_id, "file_id": file_id, "name": name,
+                "check_name_mode": "refuse"}
+        r = self._req.post(url, json=json)
+        logger.info(f'Rename {file_id} to {name}')
+        logger.debug(r.json())
+        if r.status_code == 200:
+            return r.json()['file_id']
+        return r.json()['code']
 
     def get_user_info(self) -> UserInfo:
         """
@@ -256,7 +272,7 @@ class AliyunPan(object):
                 GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
                 return self.upload_file(parent_file_id=parent_file_id, path=path, upload_timeout=upload_timeout,
                                         retry_num=retry_num, force=force, chunk_size=chunk_size, c=c)
-            elif part_info_list == 'AlreadyExist.File':
+            elif part_info_list == AliyunpanCode.existed:
                 # 漏网之鱼
                 self._print.upload_info(path, status=True, existed=True)
                 path_list.append(str(path.absolute()))

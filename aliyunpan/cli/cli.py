@@ -7,7 +7,7 @@ from aliyunpan.api.utils import *
 from aliyunpan.cli.config import Config
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, InvalidPassword, LoginFailed, InvalidConfiguration, \
-    ConfigurationFileNotFoundError
+    ConfigurationFileNotFoundError, AliyunpanCode
 
 __all__ = ['Commander']
 
@@ -75,13 +75,33 @@ class Commander:
 
     def rm(self, path):
         file_id = self._path_list.get_path_fid(path, update=False)
-        if not file_id:
-            raise FileNotFoundError(path)
-        file_id_ = self._disk.delete_file(file_id)
-        if file_id_ == file_id:
-            self._path_list._tree.remove_node(file_id)
-            self._print.remove_info(path, status=False)
-        return file_id_
+        if file_id:
+            file_id_ = self._disk.delete_file(file_id)
+            if file_id_ == file_id:
+                file_id = file_id_
+                self._print.remove_info(path, status=False)
+                self._path_list._tree.remove_node(file_id)
+            else:
+                file_id = False
+        return file_id
+
+    def rename(self, path, name):
+        file_id = self._path_list.get_path_fid(path, update=False)
+        status = False
+        existed = False
+        if file_id:
+            file_id_ = self._disk.update_file(file_id, name)
+            if file_id_ == AliyunpanCode.existed:
+                file_id = False
+                existed = True
+            elif file_id_ == file_id:
+                file_id = file_id_
+                self._path_list.update_path_list(file_id=self._path_list._tree.get_node(file_id).data.pid, depth=0)
+                status = True
+        else:
+            status = False
+        self._print.rename_info(path, name=name, status=status, existed=existed)
+        return file_id
 
     def mv(self, path, target_path):
         file_id = self._path_list.get_path_fid(path, update=False)

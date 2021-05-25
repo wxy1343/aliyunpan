@@ -170,6 +170,7 @@ class Printer(OutPut):
         self._move_title = 'mv'
         self._link_info = ' -> '
         self._remove_title = 'rm'
+        self._rename_title = 'rename'
         self._hash_title = 'hash'
         self._time_info = 'time:{:.2f}s'
         self.avg_info = 'avg:{:.2f}{}/s'
@@ -177,6 +178,7 @@ class Printer(OutPut):
         self._mkdir_color = Fore.LIGHTCYAN_EX
         self._move_color = Fore.LIGHTMAGENTA_EX
         self._remove_color = Fore.LIGHTRED_EX
+        self._rename_color = Fore.LIGHTBLUE_EX
         self._wait_color = Fore.MAGENTA
         self._error_color = Fore.RED
         self._print = OutPutSingleton().output
@@ -185,10 +187,12 @@ class Printer(OutPut):
 
     output = property(lambda self: self._print, lambda self, value: self._print.send(value) if self._output else None)
 
-    def get_info(self, status, path, *args, target_path=None, refresh_line=False):
+    def get_info(self, status, path, *args, existed=False, target_path=None, refresh_line=False):
         path_info = str(path) + self._link_info + str(target_path) if target_path else str(path)
         flag = Flag(status)
         info = self._info.format(flag)
+        if existed:
+            args = (*args[:1], self._existed_title, *args[1:])
         for i in args:
             if i:
                 info += self._info.format(i)
@@ -206,16 +210,12 @@ class Printer(OutPut):
             t -= 1
             time.sleep(1)
 
-    def upload_info(self, path, status=None, refresh_line=False, rapid_upload=False, t=None, average_speed=None,
-                    existed=False, *args, **kwargs):
+    def upload_info(self, path, status=None, refresh_line=False, rapid_upload=False, t=None, average_speed=None, *args,
+                    **kwargs):
         t = self._time_info.format(t) if t else None
         average_speed = self.avg_info.format(*str_of_size(average_speed, tuple_=True)) if average_speed else None
         rapid_title = self._rapid_upload_title if rapid_upload else None
-        if existed:
-            existed_title = self._existed_title
-        else:
-            existed_title = None
-        info = self.get_info(status, path, self._upload_title, existed_title, rapid_title, t, average_speed, *args,
+        info = self.get_info(status, path, self._upload_title, rapid_title, t, average_speed, *args,
                              refresh_line=refresh_line, **kwargs)
         self.output = info
 
@@ -239,6 +239,11 @@ class Printer(OutPut):
         info = self.get_info(status, path, self._remove_title, *args, **kwargs)
         info.error = False
         info.color = self._remove_color or info.color
+        self.output = info
+
+    def rename_info(self, path, name, status=None, *args, **kwargs):
+        info = self.get_info(status, path, self._rename_title, *args, target_path=name, **kwargs)
+        info.color = self._rename_color or info.color
         self.output = info
 
     def hash_info(self, path, status=None, size=None, *args, **kwargs):
