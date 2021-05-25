@@ -5,6 +5,7 @@ from aliyunpan.api.models import *
 from aliyunpan.api.req import *
 from aliyunpan.api.utils import *
 from aliyunpan.cli.config import Config
+from aliyunpan.cli.tui import AliyunpanTUI
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, InvalidPassword, LoginFailed, InvalidConfiguration, \
     ConfigurationFileNotFoundError, AliyunpanCode
@@ -414,3 +415,7 @@ class Commander:
                 file = self._path_list._tree.get_node(file_id).data
                 url = f'{self._share_link}{Path(path).name}|{file.content_hash}|{file.size}|root'
                 print(f'python main.py upload -s "{url}"')
+
+    def tui(self):
+        aliyunpan_tui = AliyunpanTUI(self)
+        aliyunpan_tui.run()

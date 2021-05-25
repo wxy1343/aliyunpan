@@ -46,6 +46,7 @@ echo "password: 'xxxxx'"  >>  ~/.config/aliyunpan.yaml
 |share (s)           |分享文件                        |
 |mkdir (m)           |创建文件夹                      |
 |cat (c)             |显示文件内容                    |
+|tui                 |文本用户界面                    |
 
 ## 使用指南
 

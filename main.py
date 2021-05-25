@@ -8,7 +8,7 @@ from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='1.4.9')
+@click.version_option(version='2.0.0')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=click.STRING, help='Specify REFRESH_TOKEN.')
@@ -127,6 +127,12 @@ def share(path, file_id, expire_sec, share_link, download_link, save):
 @click.option('-e', '--encoding', type=click.STRING, default='utf-8', show_default=True)
 def cat(path, encoding):
     click.echo(commander.cat(path, encoding))
+
+
+@cli.command(aliases=['tui'], help='Text-based User Interface.')
+@click.help_option('-h', '--help')
+def tui():
+    commander.tui()
 
 
 if __name__ == '__main__':
