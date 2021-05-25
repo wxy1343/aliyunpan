@@ -4,6 +4,7 @@ from pathlib import PurePosixPath, Path
 import npyscreen
 from threading import Thread
 import functools
+import pyperclip
 
 __all__ = ['AliyunpanTUI']
 
@@ -25,10 +26,12 @@ class Text:
 
 class AliyunpanFileForm(npyscreen.FormBaseNewWithMenus):
     def create(self):
-        self.file_menu = self.add_menu(name="Menu", shortcut="^F")
+        self.file_menu = self.add_menu(name='Menu', shortcut='^M')
         file = self.add(FileGrid)
-        self.file_menu.addItemsFromList([
-            ("download", file.download)
+        self.download_menu = self.file_menu.addNewSubmenu(name='Download Menu', shortcut='^D')
+        self.download_menu.addItemsFromList([
+            ("Copy the download link", file.copy_download_link, '^C'),
+            ("Download file", file.download, '^D')
         ])
 
 
@@ -66,6 +69,15 @@ class FileGrid(npyscreen.SimpleGrid):
                 Thread(target=functools.partial(self.parent.parentApp._cli.download_file, path=Path(file_info.name),
                                                 url=file_info.download_url),
                        daemon=True).start()
+
+    def copy_download_link(self):
+        for file_info in self._file_list:
+            if file_info.name == self.file_name:
+                url = self.parent.parentApp._cli._disk.get_download_url(file_info.id)
+                if url:
+                    pyperclip.copy(url)
+                    npyscreen.notify_confirm(f'Already copied to clipboard!\n{Text(file_info.name)}\n{url}')
+                break
 
     def update_file_list(self, name=None, file_id=None):
         file_list = []

@@ -8,7 +8,7 @@ from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='2.0.0')
+@click.version_option(version='2.0.1')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=click.STRING, help='Specify REFRESH_TOKEN.')
@@ -105,7 +105,7 @@ def tree(path):
     commander.tree(path)
 
 
-@cli.command(aliases=['s'], help='Share file download link.')
+@cli.command(aliases=['s'], help='Share file sharing link.')
 @click.help_option('-h', '--help')
 @click.argument('path', type=click.Path(), default='')
 @click.option('-f', '--file-id', type=click.STRING, default='', help='File id.')
