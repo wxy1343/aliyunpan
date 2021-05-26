@@ -27,6 +27,7 @@ class Text:
 
 class AliyunpanFileForm(npyscreen.FormBaseNewWithMenus):
     def create(self):
+        npyscreen.setTheme(npyscreen.Themes.ColorfulTheme)
         self.file_menu = self.add_menu(name='Menu')
         file = self.add(FileGrid)
         self.download_menu = self.file_menu.addNewSubmenu(name='Download Menu', shortcut='^D')
@@ -50,17 +51,40 @@ class DeviceSelect(npyscreen.TitleSelectOne):
         raise KeyboardInterrupt
 
 
+class Time(npyscreen.TitleText):
+    def set_up_handlers(self):
+        super(Time, self).set_up_handlers()
+        self.handlers.update({
+            '^C': self._exit
+        })
+
+    def _exit(self, _):
+        raise KeyboardInterrupt
+
+
 class Dlna(npyscreen.FormWithMenus):
     def create(self):
         self.device_menu = self.add_menu(name='Device Menu')
         self.device_menu.addItemsFromList([
             ('Play', self.play, '^A'),
+            ('Pause', self.pause, '^P'),
+            ('Continue', self.continue_, '^O'),
+            ('Mute', self.mute, '^Q'),
+            ('Unmute', self.unmute, '^E'),
             ('Stop', self.stop, '^S'),
             ('Refresh Device', self.refresh_device, '^R')
         ])
         self.devices = []
-        self.device_select = self.add(DeviceSelect, scroll_exit=False, name='Devices',
-                                      value_changed_callback=self.value_changed_callback)
+        self.device_select = self.add(DeviceSelect, scroll_exit=False, name='Devices', max_height=5,
+                                      value_changed_callback=self.device_changed_callback)
+        self.add(npyscreen.TitleSlider, color='STANDOUT', name='Volume', out_of=10,
+                 value_changed_callback=self.volume_changed_callback)
+        self.position = '00:00:00'
+        self.second = self.add(Time, name='sec', value='00')
+        self.minute = self.add(Time, name='min', value='00')
+        self.hour = self.add(Time, name='hour', value='00');
+        self._volume = 0
+        self.add(npyscreen.ButtonPress, relx=0, name='Set time', when_pressed_function=self.set_time)
 
     def beforeEditing(self):
         self.file_info = self.parentApp.file_info
@@ -77,7 +101,7 @@ class Dlna(npyscreen.FormWithMenus):
     def afterEditing(self):
         self.parentApp.setNextFormPrevious()
 
-    def value_changed_callback(self, widget):
+    def device_changed_callback(self, widget):
         if widget.value and len(self.devices):
             device = self.devices[widget.value[0]]
             url = self.parentApp._cli._disk.get_download_url(self.file_info.id)
@@ -88,11 +112,31 @@ class Dlna(npyscreen.FormWithMenus):
     def play(self):
         self.device_select.value = [self.device_select.entry_widget.cursor_line]
 
+    def pause(self):
+        if len(self.devices) and self.device_select.entry_widget.value:
+            device = self.devices[self.device_select.entry_widget.value[0]]
+            device.pause()
+
+    def continue_(self):
+        if len(self.devices) and self.device_select.entry_widget.value:
+            device = self.devices[self.device_select.entry_widget.value[0]]
+            device.play()
+
     def stop(self):
-        if len(self.devices):
-            self.device_select.value = []
-            device = self.devices[self.device_select.entry_widget.cursor_line]
+        if len(self.devices) and self.device_select.entry_widget.value:
+            device = self.devices[self.device_select.entry_widget.value[0]]
+            self.device_select.entry_widget.value = []
             device.stop()
+
+    def mute(self):
+        if len(self.devices) and self.device_select.entry_widget.value:
+            device = self.devices[self.device_select.entry_widget.value[0]]
+            device.mute()
+
+    def unmute(self):
+        if len(self.devices) and self.device_select.entry_widget.value:
+            device = self.devices[self.device_select.entry_widget.value[0]]
+            device.unmute()
 
     def discover(self):
         self.name = 'Refresh Device...'
@@ -107,6 +151,26 @@ class Dlna(npyscreen.FormWithMenus):
 
     def refresh_device(self):
         Thread(target=Dlna.discover, args=(self,), daemon=True).start()
+
+    def volume_changed_callback(self, widget):
+        if len(self.devices) and self.device_select.entry_widget.value and self._volume != widget.value:
+            self._volume = widget.value
+            device = self.devices[self.device_select.entry_widget.value[0]]
+            device.volume(int(widget.value) * 10)
+
+    def set_position(self, second=None, minute=None, hour=None):
+        position = '{:02d}:{:02d}:{:02d}'
+        if len(self.devices) and self.device_select.entry_widget.value:
+            position = position.format(hour, minute, second)
+            npyscreen.notify_confirm(position)
+            device = self.devices[self.device_select.entry_widget.value[0]]
+            device.seek(position)
+
+    def set_time(self):
+        try:
+            self.set_position(second=int(self.second.value), minute=int(self.minute.value), hour=int(self.hour.value))
+        except ValueError:
+            pass
 
 
 class FileGrid(npyscreen.SimpleGrid):
