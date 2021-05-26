@@ -8,7 +8,7 @@ from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='2.1.1')
+@click.version_option(version='2.1.2')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=click.STRING, help='Specify REFRESH_TOKEN.')
@@ -89,13 +89,14 @@ def mkdir(path):
 @click.option('-p', '--file', multiple=True, help='Select multiple files.', type=click.Path())
 @click.argument('save_path', type=click.Path(), default='')
 @click.option('-s', 'share', is_flag=True, help='Specify the shared sequence file')
-def download(path, file, save_path, share):
+@click.option('-cs', '--chunk-size', type=click.INT, help='Chunk size(byte).', default=1048576, show_default=True)
+def download(path, file, save_path, share, chunk_size):
     if not path and not file:
         raise click.MissingParameter(param=click.get_current_context().command.params[2])
     else:
         file_list = {*file, path}
 
-    commander.download(file_list, save_path, share=share)
+    commander.download(file_list, save_path, share=share, chunk_size=chunk_size)
 
 
 @cli.command(aliases=['t', 'show'], help='View file tree.')

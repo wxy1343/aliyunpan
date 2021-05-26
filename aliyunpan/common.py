@@ -264,6 +264,7 @@ class Bar(Printer):
         self._time = time.time()
         self._average_speed = 0
         self._count = 0
+        self._refresh_time = 0
 
     time = property(lambda self: time.time() - self._start_time)
     average_speed = property(lambda self: self._average_speed)
@@ -273,12 +274,14 @@ class Bar(Printer):
 
     def update(self, ratio=None, refresh_line=False):
         self._count += 1
+        t = 0
         if ratio is not None:
             t = time.time() - self._time
             self._time = time.time()
             self._average_speed = self._get_average_speed(ratio, t)
             self._ratio = ratio
-        if self._output:
+        if self._output and t and time.time() - self._refresh_time > 0.3:
+            self._refresh_time = time.time()
             self.output = Info(
                 self._upload_info.format(self._title, '.' * (4 - (self._count % 3 or 3)), '=' * int(self._ratio * 10),
                                          '*' * (10 - int(self._ratio * 10)), self._ratio,

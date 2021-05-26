@@ -276,7 +276,7 @@ class Commander:
                 self._print.upload_info(p, status=False)
         return folder_list, file_list
 
-    def download(self, path, save_path=None, single_file=False, share=False):
+    def download(self, path, save_path=None, single_file=False, share=False, chunk_size=1048576):
         if not save_path:
             save_path = Path().cwd()
         save_path = Path(save_path)
@@ -296,7 +296,7 @@ class Commander:
                     except FileExistsError:
                         pass
                 for file_id, path in file_list:
-                    self.download_file(save_path / path, self._disk.get_download_url(file_id))
+                    self.download_file(save_path / path, self._disk.get_download_url(file_id), chunk_size)
                 for file_id, path in file_list:
                     self._path_list.update_path_list(path.parent, depth=0, is_fid=False)
                     try:
@@ -325,11 +325,11 @@ class Commander:
                 if single_file:
                     p = save_path / p.name
                 self._print.download_info(p)
-                self.download_file(p, file_node.download_url)
+                self.download_file(p, file_node.download_url, chunk_size)
             else:
                 self.download(self._path_list.get_fid_list(file_node.id), save_path / p.name)
 
-    def download_file(self, path, url):
+    def download_file(self, path, url, chunk_size=1048576):
         try:
             path.parent.mkdir(parents=True)
             self._print.mkdir_info(path.parent, status=True)
@@ -354,7 +354,7 @@ class Commander:
             download_bar = DownloadBar(size=file_size)
             download_bar.update(refresh_line=False)
             with path.open(mode) as f:
-                for chunk in r.iter_content(chunk_size=1024):
+                for chunk in r.iter_content(chunk_size=chunk_size):
                     k = temp_size / file_size
                     download_bar.update(ratio=k, refresh_line=True)
                     if chunk:

@@ -126,6 +126,11 @@ python main.py COMMAND -h
                 <td>-s, share</td>
                 <td>指定分享的序列文件</td>
             </tr>
+            </tr>
+                <td>download</td>
+                <td>-cs, --chunk-size</td>
+                <td>分块大小(字节)</td>
+            </tr> 
             <tr>
                 <td>ls</td>
                 <td>-l</td>
