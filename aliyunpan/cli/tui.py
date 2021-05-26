@@ -2,9 +2,10 @@ import curses
 import platform
 from pathlib import PurePosixPath, Path
 import npyscreen
-from threading import Thread
 import functools
 import pyperclip
+from threading import Thread
+from aliyunpan.api.utils import logger
 
 __all__ = ['AliyunpanTUI']
 
@@ -26,13 +27,86 @@ class Text:
 
 class AliyunpanFileForm(npyscreen.FormBaseNewWithMenus):
     def create(self):
-        self.file_menu = self.add_menu(name='Menu', shortcut='^M')
+        self.file_menu = self.add_menu(name='Menu')
         file = self.add(FileGrid)
         self.download_menu = self.file_menu.addNewSubmenu(name='Download Menu', shortcut='^D')
         self.download_menu.addItemsFromList([
-            ("Copy the download link", file.copy_download_link, '^C'),
-            ("Download file", file.download, '^D')
+            ('Copy the download link', file.copy_download_link, '^C'),
+            ('Download file', file.download, '^D')
         ])
+        self.file_menu.addItemsFromList([
+            ('Cast screen to TV', file.dlna, '^A')
+        ])
+
+
+class DeviceSelect(npyscreen.TitleSelectOne):
+    def set_up_handlers(self):
+        super(DeviceSelect, self).set_up_handlers()
+        self.handlers.update({
+            '^C': self._exit
+        })
+
+    def _exit(self, _):
+        raise KeyboardInterrupt
+
+
+class Dlna(npyscreen.FormWithMenus):
+    def create(self):
+        self.device_menu = self.add_menu(name='Device Menu')
+        self.device_menu.addItemsFromList([
+            ('Play', self.play, '^A'),
+            ('Stop', self.stop, '^S'),
+            ('Refresh Device', self.refresh_device, '^R')
+        ])
+        self.devices = []
+        self.device_select = self.add(DeviceSelect, scroll_exit=False, name='Devices',
+                                      value_changed_callback=self.value_changed_callback)
+
+    def beforeEditing(self):
+        self.file_info = self.parentApp.file_info
+        self.name = str(Text(self.file_info.name))
+        try:
+            from dlnap.dlnap import dlnap
+        except ImportError as e:
+            self.name = e.__str__()
+            logger.error('Cannot find submodule dlnap.')
+        else:
+            self.dlnap = dlnap
+            self.refresh_device()
+
+    def afterEditing(self):
+        self.parentApp.setNextFormPrevious()
+
+    def value_changed_callback(self, widget):
+        if widget.value and len(self.devices):
+            device = self.devices[widget.value[0]]
+            url = self.parentApp._cli._disk.get_download_url(self.file_info.id)
+            logger.info(f'Device {device} is playing {self.file_info.name}')
+            if url:
+                device.set_current_media(url)
+
+    def play(self):
+        self.device_select.value = [self.device_select.entry_widget.cursor_line]
+
+    def stop(self):
+        if len(self.devices):
+            self.device_select.value = []
+            device = self.devices[self.device_select.entry_widget.cursor_line]
+            device.stop()
+
+    def discover(self):
+        self.name = 'Refresh Device...'
+        allDevices = self.dlnap.discover(st=self.dlnap.URN_AVTransport)
+        self.name = str(Text(self.file_info.name))
+        for device in allDevices:
+            if device not in self.devices:
+                self.devices.append(device)
+        self.device_select.values = [Text(i) for i in self.devices]
+        logger.debug(self.devices)
+        self.display()
+
+    def refresh_device(self):
+        Thread(target=Dlna.discover, args=(self,), daemon=True).start()
 
 
 class FileGrid(npyscreen.SimpleGrid):
@@ -78,6 +152,13 @@ class FileGrid(npyscreen.SimpleGrid):
                     pyperclip.copy(url)
                     npyscreen.notify_confirm(f'Already copied to clipboard!\n{Text(file_info.name)}\n{url}')
                 break
+
+    def dlna(self):
+        for file_info in self._file_list:
+            if file_info.name == self.file_name and file_info.type:
+                self.parent.parentApp.file_info = file_info
+                self.parent.parentApp.switchForm('DLNA')
+                return
 
     def update_file_list(self, name=None, file_id=None):
         file_list = []
@@ -137,7 +218,9 @@ class FileGrid(npyscreen.SimpleGrid):
 class AliyunpanTUI(npyscreen.NPSAppManaged):
     def __init__(self, cli):
         self._cli = cli
+        self.file_info = None
         super(AliyunpanTUI, self).__init__()
 
     def onStart(self):
         self.addForm('MAIN', AliyunpanFileForm)
+        self.addForm('DLNA', Dlna)

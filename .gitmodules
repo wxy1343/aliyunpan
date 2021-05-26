@@ -1,0 +1,3 @@
+[submodule "dlnap"]
+	path = dlnap
+	url = https://github.com/cherezov/dlnap

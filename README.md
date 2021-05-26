@@ -6,6 +6,12 @@
 环境要求： python 3.7 通过测试  
 ~~低版本环境运行报错参考~~[~~issue9~~](https://github.com/wxy1343/aliyunpan/issues/9)
 
+## 安装
+
+```shell
+git clone https://github.com/wxy1343/aliyunpan --recurse-submodules
+```
+
 ## 获取refresh_token
 
 ![token](https://github.com/wxy1343/aliyunpan/raw/main/token.png)
@@ -247,6 +253,12 @@ python main.py share 示例文件夹
 ```shell
 python main.py upload -s "aliyunpan://示例文件夹|80E7E25109D4246653B600FDFEDD8D8B0D97E517|970|root"
 ```
+
+### TUI按键指南
+
+* 显示菜单(ctrl+x)
+* 退出(ctrl+c)
+* 切换标签(↑↓←→,kjhl,TAB)
 
 ## 致谢
 

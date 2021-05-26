@@ -8,7 +8,7 @@ from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='2.0.1')
+@click.version_option(version='2.1.0')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=click.STRING, help='Specify REFRESH_TOKEN.')

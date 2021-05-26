@@ -31,7 +31,11 @@ class PathList:
                                      hidden=i['hidden'], category=i['category'], content_type=i['content_type'],
                                      size=i['size'], content_hash_name=i['content_hash_name'],
                                      content_hash=i['content_hash'],
-                                     download_url=i['download_url'] if 'download_url' in i else '')
+                                     download_url=i['download_url'] if 'download_url' in i else '',
+                                     video_media_metadata=i[
+                                         'video_media_metadata'] if 'video_media_metadata' in i else None,
+                                     video_preview_metadata=i[
+                                         'video_preview_metadata'] if 'video_preview_metadata' in i else None)
             else:
                 file_info = FileInfo(name=i['name'], id=i['file_id'], pid=i['parent_file_id'], type=False,
                                      ctime=time.strptime(i['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
