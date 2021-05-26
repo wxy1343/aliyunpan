@@ -160,7 +160,7 @@ class Commander:
                         if not self._path_list.get_path_fid(share_info.name, update=False):
                             self.upload_share(share_info)
                             self._path_list.update_path_list(depth=0)
-                        if share_info.path == 'root':
+                        if str(share_info.path) == 'root':
                             path_ = share_info.name
                         else:
                             path_ = share_info.path / share_info.name
@@ -168,7 +168,7 @@ class Commander:
                             if line.startswith(self._share_link):
                                 share_list.append(parse_share_url(line))
                         self.rm(path_)
-                        if upload_path == 'root':
+                        if str(upload_path) == 'root':
                             upload_path = share_info.path
                         else:
                             upload_path /= share_info.path
@@ -247,15 +247,23 @@ class Commander:
         upload_path = PurePosixPath(Path(upload_path).as_posix())
         folder_list = []
         file_list = []
+        file_id_list = None
         for share_info in share_info_list:
-            file_id_list = self.mkdir(upload_path / share_info.path)
+            path = share_info.path
+            if str(upload_path) in ('', '.') and str(path) == 'root':
+                path = Path('')
+            if str(upload_path) == 'root':
+                upload_path = PurePosixPath('')
+            p = upload_path / path
+            if str(p) not in ('', '.'):
+                file_id_list = self.mkdir(upload_path / path)
             if file_id_list:
                 for file_id, path in file_id_list:
                     folder_list.append((file_id, upload_path / path))
         folder_list = tuple(set(folder_list))
         for share_info in share_info_list:
             path = share_info.path
-            if not str(upload_path) and str(path) == 'root':
+            if str(upload_path) in ('', '.') and str(path) == 'root':
                 path = Path('')
             parent_file_id = self._path_list.get_path_fid(upload_path / path)
             result = self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.content_hash_name,
