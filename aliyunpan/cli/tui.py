@@ -1,10 +1,12 @@
 import curses
+import functools
 import platform
 from pathlib import PurePosixPath, Path
-import npyscreen
-import functools
-import pyperclip
 from threading import Thread
+
+import npyscreen
+import pyperclip
+
 from aliyunpan.api.utils import logger
 
 __all__ = ['AliyunpanTUI']
@@ -82,7 +84,7 @@ class Dlna(npyscreen.FormWithMenus):
         self.position = '00:00:00'
         self.second = self.add(Time, name='sec', value='00')
         self.minute = self.add(Time, name='min', value='00')
-        self.hour = self.add(Time, name='hour', value='00');
+        self.hour = self.add(Time, name='hour', value='00')
         self._volume = 0
         self.add(npyscreen.ButtonPress, relx=0, name='Set time', when_pressed_function=self.set_time)
 
@@ -204,13 +206,19 @@ class FileGrid(npyscreen.SimpleGrid):
     def download(self):
         for file_info in self._file_list:
             if file_info.name == self.file_name:
-                Thread(target=functools.partial(self.parent.parentApp._cli.download_file, path=Path(file_info.name),
-                                                url=file_info.download_url),
-                       daemon=True).start()
+                if file_info.type:
+                    Thread(target=functools.partial(self.parent.parentApp._cli.download_file, path=Path(file_info.name),
+                                                    url=file_info.download_url)).start()
+                else:
+                    path = Path(file_info.name)
+                    if self.parent.name != 'root':
+                        path = self.parent.name / Path(file_info.name)
+                    Thread(target=functools.partial(self.parent.parentApp._cli.download, path=str(path))).start()
+                break
 
     def copy_download_link(self):
         for file_info in self._file_list:
-            if file_info.name == self.file_name:
+            if file_info.name == self.file_name and file_info.type:
                 url = self.parent.parentApp._cli._disk.get_download_url(file_info.id)
                 if url:
                     pyperclip.copy(url)

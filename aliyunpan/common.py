@@ -3,7 +3,9 @@ import sys
 import time
 from abc import abstractmethod
 from threading import RLock
+
 from colorama import Fore, Style, Back
+
 from aliyunpan.api.utils import str_of_size
 
 __all__ = ['DATA', 'GLOBAL_VAR', 'Printer', 'Bar', 'FileBar', 'UploadBar', 'DownloadBar', 'HashBar']
@@ -267,7 +269,7 @@ class Bar(Printer):
         self._refresh_time = 0
 
     time = property(lambda self: time.time() - self._start_time)
-    average_speed = property(lambda self: self._average_speed)
+    average_speed = property(lambda self: self._size / self.time if self.time else 0)
 
     def _get_average_speed(self, ratio, t):
         return (ratio - self._ratio) / t if t else 0
