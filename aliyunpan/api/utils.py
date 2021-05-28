@@ -14,9 +14,8 @@ logger = logging.getLogger('aliyunpan')
 log_file = ROOT_DIR + os.sep + 'aliyunpan.log'
 fmt_str = "%(asctime)s [%(filename)s:%(lineno)d] %(funcName)s %(levelname)s - %(message)s"
 logging.basicConfig(level=LOG_LEVEL,
-                    filename=log_file,
-                    filemode="a",
                     format=fmt_str,
+                    stream=open(log_file, 'a', encoding='utf-8'),
                     datefmt="%Y-%m-%d %H:%M:%S")
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)

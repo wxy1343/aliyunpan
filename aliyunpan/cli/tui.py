@@ -1,6 +1,7 @@
 import curses
 import functools
 import platform
+import time
 from pathlib import PurePosixPath, Path
 from threading import Thread
 
@@ -38,6 +39,7 @@ class AliyunpanFileForm(npyscreen.FormBaseNewWithMenus):
             ('Download file', file.download, '^D')
         ])
         self.file_menu.addItemsFromList([
+            ('Show file details', file.show_file_info, '^X'),
             ('Cast screen to TV', file.dlna, '^A')
         ])
 
@@ -74,6 +76,7 @@ class Dlna(npyscreen.FormWithMenus):
             ('Mute', self.mute, '^Q'),
             ('Unmute', self.unmute, '^E'),
             ('Stop', self.stop, '^S'),
+            ('Back', self.back, '^X'),
             ('Refresh Device', self.refresh_device, '^R')
         ])
         self.devices = []
@@ -87,6 +90,9 @@ class Dlna(npyscreen.FormWithMenus):
         self.hour = self.add(Time, name='hour', value='00')
         self._volume = 0
         self.add(npyscreen.ButtonPress, relx=0, name='Set time', when_pressed_function=self.set_time)
+
+    def back(self):
+        self.parentApp.switchFormPrevious()
 
     def beforeEditing(self):
         self.file_info = self.parentApp.file_info
@@ -112,7 +118,12 @@ class Dlna(npyscreen.FormWithMenus):
                 device.set_current_media(url)
 
     def play(self):
-        self.device_select.value = [self.device_select.entry_widget.cursor_line]
+        if len(self.devices):
+            if self.device_select.value:
+                self.device_changed_callback(self.device_select)
+            else:
+                self.device_select.value = [self.device_select.entry_widget.cursor_line]
+                self.device_changed_callback(self.device_select)
 
     def pause(self):
         if len(self.devices) and self.device_select.entry_widget.value:
@@ -149,7 +160,8 @@ class Dlna(npyscreen.FormWithMenus):
                 self.devices.append(device)
         self.device_select.values = [Text(i) for i in self.devices]
         logger.debug(self.devices)
-        self.display()
+        if self.editing:
+            self.display()
 
     def refresh_device(self):
         Thread(target=Dlna.discover, args=(self,), daemon=True).start()
@@ -180,11 +192,13 @@ class FileGrid(npyscreen.SimpleGrid):
         super(FileGrid, self).__init__(*args, **kwargs)
         self._file_name = None
         self._file_list = []
-        self._file_info = None
+        self._parent_file_info = None
         self.parent.name = 'root'
         self.update_file_list(file_id='root')
 
     file_name = property(lambda self: self.values[self.edit_cell[0]][self.edit_cell[1]])
+    _file_info = property(lambda self: [file_info for file_info in self._file_list if file_info.name == self.file_name])
+    file_info = property(lambda self: self._file_info[0] if self._file_info else None)
 
     def set_up_handlers(self):
         super(FileGrid, self).set_up_handlers()
@@ -197,72 +211,85 @@ class FileGrid(npyscreen.SimpleGrid):
         })
 
     def back(self, _):
-        if self._file_info:
-            self.update_file_list(file_id=self._file_info.pid)
+        if self._parent_file_info:
+            self.update_file_list(file_id=self._parent_file_info.pid)
 
     def _exit(self, _):
         raise KeyboardInterrupt
 
     def download(self):
-        for file_info in self._file_list:
-            if file_info.name == self.file_name:
-                if file_info.type:
-                    Thread(target=functools.partial(self.parent.parentApp._cli.download_file, path=Path(file_info.name),
-                                                    url=file_info.download_url)).start()
-                else:
-                    path = Path(file_info.name)
-                    if self.parent.name != 'root':
-                        path = self.parent.name / Path(file_info.name)
-                    Thread(target=functools.partial(self.parent.parentApp._cli.download, path=str(path))).start()
-                break
+        if self.file_info:
+            if self.file_info.type:
+                Thread(
+                    target=functools.partial(self.parent.parentApp._cli.download_file, path=Path(self.file_info.name),
+                                             url=self.file_info.download_url)).start()
+            else:
+                path = Path(self.file_info.name)
+                if self.parent.name != 'root':
+                    path = self.parent.name / Path(self.file_info.name)
+                Thread(target=functools.partial(self.parent.parentApp._cli.download, path=str(path))).start()
 
     def copy_download_link(self):
-        for file_info in self._file_list:
-            if file_info.name == self.file_name and file_info.type:
-                url = self.parent.parentApp._cli._disk.get_download_url(file_info.id)
-                if url:
-                    pyperclip.copy(url)
-                    npyscreen.notify_confirm(f'Already copied to clipboard!\n{Text(file_info.name)}\n{url}')
-                break
+        if self.file_info and self.file_info.name == self.file_name and self.file_info.type:
+            url = self.parent.parentApp._cli._disk.get_download_url(self.file_info.id)
+            if url:
+                pyperclip.copy(url)
+                npyscreen.notify_confirm(f'Already copied to clipboard!\n{Text(self.file_info.name)}\n{url}')
 
     def dlna(self):
-        for file_info in self._file_list:
-            if file_info.name == self.file_name and file_info.type:
-                self.parent.parentApp.file_info = file_info
+        if self.file_info:
+            if self.file_info.name == self.file_name and self.file_info.type:
+                self.parent.parentApp.file_info = self.file_info
                 self.parent.parentApp.switchForm('DLNA')
-                return
+
+    def show_file_info(self, file_info=None):
+        if not file_info:
+            file_info = self.file_info
+        info = f'name:{Text(file_info.name)}\n' \
+               f'file_id:{file_info.id}\n' \
+               f'type:{"file" if file_info.type else "folder"}\n' \
+               f'create_time:{time.strftime("%d %b %H:%M", file_info.ctime)}\n' \
+               f'update_time:{time.strftime("%d %b %H:%M", file_info.update_time)}\n' \
+               f'category:{file_info.category}\n' \
+               f'content_type:{file_info.content_type}\n' \
+               f'size:{file_info.size}\n' \
+               f'content_hash_name:{file_info.content_hash_name}\n' \
+               f'content_hash:{file_info.content_hash}'
+        npyscreen.notify_confirm(info, 'File info')
 
     def update_file_list(self, name=None, file_id=None):
         file_list = []
-        if name == '..' and self._file_info and self._file_info.pid:
+        if name == '..' and self._parent_file_info and self._parent_file_info.pid:
             # 返回父目录且有父目录
-            return self.update_file_list(file_id=self._file_info.pid)
+            return self.update_file_list(file_id=self._parent_file_info.pid)
         elif name:
             # 进入目录name
-            for file_info in self._file_list:
-                if file_info.name == name:
-                    self._file_list = self.parent.parentApp._cli._path_list.get_fid_list(file_info.id, update=False)
-                    # 保存当前目录信息
-                    self._file_info = file_info
-                    break
+            file_info = self.file_info
+            if file_info:
+                if file_info.type:
+                    self.show_file_info(file_info)
+                    return
+                self._file_list = self.parent.parentApp._cli._path_list.get_fid_list(file_info.id, update=False)
+                # 保存当前目录信息
+                self._parent_file_info = file_info
         elif file_id:
             # 进入目录file_id
             self._file_list = self.parent.parentApp._cli._path_list.get_fid_list(file_id, update=False)
             # 保存当前目录信息
-            self._file_info = None
+            self._parent_file_info = None
             if file_id != 'root':
-                self._file_info = self.parent.parentApp._cli._path_list._tree.get_node(file_id).data
+                self._parent_file_info = self.parent.parentApp._cli._path_list._tree.get_node(file_id).data
         for file_info in self._file_list:
             file_list.append(file_info.name)
-        if self._file_info and self._file_info.pid:
+        if self._parent_file_info and self._parent_file_info.pid:
             # 有父目录
             file_list.insert(0, '..')
         if file_list:
             self.set_grid_values_from_flat_list(file_list)
         path = 'root'
-        if self._file_info:
-            path = PurePosixPath(self._file_info.name)
-        pid = self._file_info.pid if self._file_info else None
+        if self._parent_file_info:
+            path = PurePosixPath(self._parent_file_info.name)
+        pid = self._parent_file_info.pid if self._parent_file_info else None
         while True:
             if pid:
                 file_info = self.parent.parentApp._cli._path_list._tree.get_node(pid).data

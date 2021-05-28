@@ -314,7 +314,8 @@ class AliyunPan(object):
                 task_info['file_id'] = file_id
                 task_info['part_number'] = 1
                 GLOBAL_VAR.tasks[content_hash] = task_info
-        upload_bar = UploadBar(size=file_size)
+        file_size_ = file_size - part_info_list[0]['part_number'] * self._chunk_size
+        upload_bar = UploadBar(size=file_size if file_size_ < 0 else file_size_)
         upload_bar.upload_info(path)
         upload_bar.update(refresh_line=False)
         logger.debug(f'upload_id: {upload_id}, file_id: {file_id}, part_info_list: {part_info_list}')
