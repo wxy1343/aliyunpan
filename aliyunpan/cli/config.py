@@ -22,7 +22,10 @@ class Config:
 
     def write(self, conf):
         if not conf:
-            self._config_file.unlink(missing_ok=True)
+            try:
+                self._config_file.unlink()
+            except FileNotFoundError:
+                pass
             return
         if not self._config_file.is_file():
             if not self._config_file.parent.is_dir():
