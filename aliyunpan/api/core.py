@@ -54,6 +54,7 @@ class AliyunPan(object):
         }
         logger.info('Logging in.')
         r = self._req.req(**LOGIN, access_token=False)
+        logger.debug(r.json())
         if 'bizExt' in r.json()['content']['data']:
             data = parse_biz_ext(r.json()['content']['data']['bizExt'])
             logger.debug(data)
