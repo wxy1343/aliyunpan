@@ -8,7 +8,7 @@ from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='2.1.5')
+@click.version_option(version='2.2.0')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=click.STRING, help='Specify REFRESH_TOKEN.')
@@ -35,6 +35,14 @@ def cli(config_file, refresh_token, username, password, depth, debug):
 @click.option('-l', is_flag=True, help='View details.')
 def ls(path, l):
     commander.ls(path, l)
+
+
+@cli.command(aliases=['search'], help='Search for file.')
+@click.help_option('-h', '--help')
+@click.argument('query', type=click.STRING)
+@click.option('-l', is_flag=True, help='View details.')
+def search(query, l):
+    commander.ls(path=None, l=l, query=query)
 
 
 @cli.command(aliases=['delete', 'del'], help='Delete Files.')

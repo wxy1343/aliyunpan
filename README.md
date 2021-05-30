@@ -53,6 +53,7 @@ echo "password: 'xxxxx'"  >>  ~/.config/aliyunpan.yaml
 |mkdir (m)           |创建文件夹                      |
 |cat (c)             |显示文件内容                    |
 |tui                 |文本用户界面                    |
+|search              |搜索文件/文件夹                 |
 
 ## 使用指南
 
@@ -122,17 +123,18 @@ python main.py COMMAND -h
                 <td>-p, --file</td>
                 <td>选择文件(多个)</td>
             </tr>
+            <tr>
                 <td>download</td>
                 <td>-s, share</td>
                 <td>指定分享的序列文件</td>
             </tr>
-            </tr>
+            <tr>
                 <td>download</td>
                 <td>-cs, --chunk-size</td>
                 <td>分块大小(字节)</td>
             </tr> 
             <tr>
-                <td>ls</td>
+                <td>ls,search</td>
                 <td>-l</td>
                 <td>查看详情</td>
             </tr>
@@ -181,17 +183,17 @@ python main.py COMMAND -h
                 <td>-f, --force</td>
                 <td>强制覆盖文件</td>
             </tr>
-            </tr>
+            <tr>
                 <td>upload</td>
                 <td>-s, share</td>
                 <td>指定分享的序列文件</td>
             </tr> 
-            </tr>
+            <tr>
                 <td>upload</td>
                 <td>-cs, --chunk-size</td>
                 <td>分块大小(字节)</td>
             </tr> 
-            </tr>
+            <tr>
                 <td>upload</td>
                 <td>-c</td>
                 <td>断点续传</td>

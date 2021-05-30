@@ -40,7 +40,8 @@ class AliyunpanFileForm(npyscreen.FormBaseNewWithMenus):
         ])
         self.file_menu.addItemsFromList([
             ('Show file details', file.show_file_info, '^X'),
-            ('Cast screen to TV', file.dlna, '^A')
+            ('Cast screen to TV', file.dlna, '^A'),
+            ('Search', file.search, '^F')
         ])
 
 
@@ -209,7 +210,6 @@ class Dlna(npyscreen.FormWithMenus):
 class FileGrid(npyscreen.SimpleGrid):
     def __init__(self, *args, **kwargs):
         super(FileGrid, self).__init__(*args, **kwargs)
-        self._file_name = None
         self._file_list = []
         self._parent_file_info = None
         self.parent.name = 'root'
@@ -261,6 +261,10 @@ class FileGrid(npyscreen.SimpleGrid):
                 self.parent.parentApp.file_info = self.file_info
                 self.parent.parentApp.switchForm('DLNA')
 
+    def search(self):
+        self.parent.parentApp.file_grid = self
+        self.parent.parentApp.switchForm('Search')
+
     def show_file_info(self, file_info=None):
         if not file_info:
             file_info = self.file_info
@@ -278,6 +282,7 @@ class FileGrid(npyscreen.SimpleGrid):
 
     def update_file_list(self, name=None, file_id=None):
         file_list = []
+        self.searched = False
         if name == '..' and self._parent_file_info and self._parent_file_info.pid:
             # 返回父目录且有父目录
             return self.update_file_list(file_id=self._parent_file_info.pid)
@@ -305,6 +310,9 @@ class FileGrid(npyscreen.SimpleGrid):
             file_list.insert(0, '..')
         if file_list:
             self.set_grid_values_from_flat_list(file_list)
+        self.update_path()
+
+    def update_path(self):
         path = 'root'
         if self._parent_file_info:
             path = PurePosixPath(self._parent_file_info.name)
@@ -339,6 +347,31 @@ class FileGrid(npyscreen.SimpleGrid):
         return Text(vl)
 
 
+class Search(npyscreen.ActionPopup):
+    def create(self):
+        self.query = self.add(npyscreen.TitleText, name='query')
+
+    def afterEditing(self):
+        self.parentApp.setNextFormPrevious()
+
+    def on_ok(self):
+        file_info_list = self.parentApp._cli._path_list.get_file_info(
+            self.parentApp._cli._disk.search(self.query.value))
+        if not self.parentApp.file_grid.searched:
+            self.parentApp.file_grid.searched = True
+            self.parentApp.file_grid._parent_file_info = self.parentApp.file_grid.file_info
+        self.parentApp.file_grid._file_list = file_info_list
+        file_list = ['..']
+        for file_info in file_info_list:
+            file_list.append(file_info.name)
+        self.parentApp.file_grid.set_grid_values_from_flat_list(file_list)
+        self.parentApp.file_grid.parent.name = f'{self.query.value}'
+        self.parentApp.file_grid._display()
+
+    def on_cancel(self):
+        pass
+
+
 class AliyunpanTUI(npyscreen.NPSAppManaged):
     def __init__(self, cli):
         self._cli = cli
@@ -348,3 +381,4 @@ class AliyunpanTUI(npyscreen.NPSAppManaged):
     def onStart(self):
         self.addForm('MAIN', AliyunpanFileForm)
         self.addForm('DLNA', Dlna)
+        self.addForm('Search', Search)

@@ -70,7 +70,7 @@ class AliyunPan(object):
             return self._refresh_token
         return False
 
-    def get_file_list(self, parent_file_id: str = 'root', next_marker: str = None) -> dict:
+    def get_file_list(self, parent_file_id: str = 'root', next_marker: str = None) -> list:
         """
         获取文件列表
         :param parent_file_id:
@@ -83,7 +83,7 @@ class AliyunPan(object):
         r = self._req.post(url, json=json)
         logger.debug(r.status_code)
         if 'items' not in r.json():
-            return False
+            return []
         file_list = r.json()['items']
         if 'next_marker' in r.json() and r.json()['next_marker'] and next_marker != r.json()['next_marker']:
             file_list.extend(self.get_file_list(parent_file_id, r.json()['next_marker']))
@@ -502,3 +502,24 @@ class AliyunPan(object):
             logger.debug(r.json())
             print(r.json()["message"])
         return False
+
+    def search(self, query: str, next_marker: str = None):
+        """
+        搜索文件
+        :param query
+        :param next_marker
+        """
+        url = 'https://api.aliyundrive.com/v2/file/search'
+        json = {
+            'drive_id': self.drive_id,
+            'query': f'name match \"{query}\"',
+            'order_by': 'updated_at DESC'
+        }
+        r = self._req.post(url, json=json)
+        logger.debug(r.status_code)
+        if 'items' not in r.json():
+            return []
+        file_list = r.json()['items']
+        if 'next_marker' in r.json() and r.json()['next_marker'] and next_marker != r.json()['next_marker']:
+            file_list.extend(self.search(query, r.json()['next_marker']))
+        return file_list

@@ -61,8 +61,12 @@ class Commander:
         else:
             raise ConfigurationFileNotFoundError
 
-    def ls(self, path, l):
-        for i in self._path_list.get_path_list(path, update=False):
+    def ls(self, path, l, query=None):
+        if query:
+            file_info_list = self._path_list.get_file_info(self._disk.search(query))
+        else:
+            file_info_list = self._path_list.get_path_list(path, update=False)
+        for i in file_info_list:
             if l:
                 if i.type:
                     print(str_of_size(i.size), time.strftime('%d %b %H:%M', i.ctime), i.id, i.name)

@@ -23,24 +23,8 @@ class PathList:
         file_list = self._disk.get_file_list(file_id)
         if not file_list:
             return False
-        for i in file_list:
-            if i['type'] == 'file':
-                file_info = FileInfo(name=i['name'], id=i['file_id'], pid=i['parent_file_id'], type=True,
-                                     ctime=time.strptime(i['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
-                                     update_time=time.strptime(i['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
-                                     hidden=i['hidden'], category=i['category'], content_type=i['content_type'],
-                                     size=i['size'], content_hash_name=i['content_hash_name'],
-                                     content_hash=i['content_hash'],
-                                     download_url=i['download_url'] if 'download_url' in i else '',
-                                     video_media_metadata=i[
-                                         'video_media_metadata'] if 'video_media_metadata' in i else None,
-                                     video_preview_metadata=i[
-                                         'video_preview_metadata'] if 'video_preview_metadata' in i else None)
-            else:
-                file_info = FileInfo(name=i['name'], id=i['file_id'], pid=i['parent_file_id'], type=False,
-                                     ctime=time.strptime(i['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
-                                     update_time=time.strptime(i['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
-                                     hidden=i['hidden'])
+        for info in file_list:
+            file_info = self.get_file_info(info)[0]
             if self._tree.get_node(file_info.id):
                 self._tree.update_node(file_info.id, data=file_info)
             else:
@@ -48,6 +32,35 @@ class PathList:
             if not file_info.type and depth:
                 self.update_path_list(file_id=file_info.id, depth=depth - 1)
         return True
+
+    @staticmethod
+    def get_file_info(info):
+        file_info_list = []
+        if not isinstance(info, list):
+            info_list = [info]
+        else:
+            info_list = info
+        for info in info_list:
+            if info['type'] == 'file':
+                file_info = FileInfo(name=info['name'], id=info['file_id'], pid=info['parent_file_id'], type=True,
+                                     ctime=time.strptime(info['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                                     update_time=time.strptime(info['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                                     hidden=info['hidden'], category=info['category'],
+                                     content_type=info['content_type'],
+                                     size=info['size'], content_hash_name=info['content_hash_name'],
+                                     content_hash=info['content_hash'],
+                                     download_url=info['download_url'] if 'download_url' in info else '',
+                                     video_media_metadata=info[
+                                         'video_media_metadata'] if 'video_media_metadata' in info else None,
+                                     video_preview_metadata=info[
+                                         'video_preview_metadata'] if 'video_preview_metadata' in info else None)
+            else:
+                file_info = FileInfo(name=info['name'], id=info['file_id'], pid=info['parent_file_id'], type=False,
+                                     ctime=time.strptime(info['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                                     update_time=time.strptime(info['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                                     hidden=info['hidden'])
+            file_info_list.append(file_info)
+        return file_info_list
 
     def tree(self, path='root'):
         file_id = self.get_path_fid(path, update=False)
