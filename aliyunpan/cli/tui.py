@@ -71,8 +71,9 @@ class Dlna(npyscreen.FormWithMenus):
         self.device_menu = self.add_menu(name='Device Menu')
         self.device_menu.addItemsFromList([
             ('Play', self.play, '^A'),
-            ('Pause', self.pause, '^P'),
-            ('Continue', self.continue_, '^O'),
+            ('Proxy Play', self.proxy_play, 'y'),
+            ('Pause', self.pause, 'p'),
+            ('Continue', self.continue_, 'c'),
             ('Mute', self.mute, '^Q'),
             ('Unmute', self.unmute, '^E'),
             ('Stop', self.stop, '^S'),
@@ -89,6 +90,8 @@ class Dlna(npyscreen.FormWithMenus):
         self.minute = self.add(Time, name='min', value='00')
         self.hour = self.add(Time, name='hour', value='00')
         self._volume = 0
+        self._proxy_port = 8000
+        self._change_lock_time = 0
         self.add(npyscreen.ButtonPress, relx=0, name='Set time', when_pressed_function=self.set_time)
 
     def back(self):
@@ -109,21 +112,35 @@ class Dlna(npyscreen.FormWithMenus):
     def afterEditing(self):
         self.parentApp.setNextFormPrevious()
 
-    def device_changed_callback(self, widget):
-        if widget.value and len(self.devices):
+    def device_changed_callback(self, widget, proxy=False):
+        if time.time() - self._change_lock_time > 1:
+            self._change_lock_time = 0
+        if widget.value and len(self.devices) and not self._change_lock_time:
+            self._change_lock_time = time.time()
             device = self.devices[widget.value[0]]
             url = self.parentApp._cli._disk.get_download_url(self.file_info.id)
             logger.info(f'Device {device} is playing {self.file_info.name}')
             if url:
+                if proxy:
+                    ip = self.dlnap._get_serve_ip(device.ip)
+                    Thread(target=self.dlnap.runProxy, daemon=True,
+                           kwargs={'ip': ip, 'port': 8000}).start()
+                    url = 'http://{}:{}/{}'.format(ip, self._proxy_port, url)
+                logger.debug(url)
                 device.set_current_media(url)
 
-    def play(self):
+    def play(self, proxy=False):
         if len(self.devices):
             if self.device_select.value:
-                self.device_changed_callback(self.device_select)
+                self.device_changed_callback(self.device_select, proxy=proxy)
             else:
                 self.device_select.value = [self.device_select.entry_widget.cursor_line]
-                self.device_changed_callback(self.device_select)
+                self.device_changed_callback(self.device_select, proxy=proxy)
+
+    def proxy_play(self):
+        global running
+        running = False
+        self.play(proxy=True)
 
     def pause(self):
         if len(self.devices) and self.device_select.entry_widget.value:
@@ -139,6 +156,8 @@ class Dlna(npyscreen.FormWithMenus):
         if len(self.devices) and self.device_select.entry_widget.value:
             device = self.devices[self.device_select.entry_widget.value[0]]
             self.device_select.entry_widget.value = []
+            global running
+            running = False
             device.stop()
 
     def mute(self):
@@ -302,7 +321,13 @@ class FileGrid(npyscreen.SimpleGrid):
                 break
         if path:
             self.parent.name = str(Text(path))
+            self._display()
+
+    def _display(self):
+        if platform.system() == 'Windows':
             self.parent.display()
+        else:
+            self.parent.DISPLAY()
 
     def keyboard_handlers(self, _):
         self.update_file_list(self.file_name)

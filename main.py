@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 import click
 from click_aliases import ClickAliasedGroup
-
+from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='2.1.4')
+@click.version_option(version='2.1.5')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=click.STRING, help='Specify REFRESH_TOKEN.')
 @click.option('-u', 'username', type=click.STRING, help='Specify USERNAME.')
 @click.option('-p', 'password', type=click.STRING, help='Specify PASSWORD.')
 @click.option('-d', '--depth', type=click.INT, help='File recursion depth.', default=3, show_default=True)
-def cli(config_file, refresh_token, username, password, depth):
+@click.option('--debug', is_flag=True, help='Debug mode.')
+def cli(config_file, refresh_token, username, password, depth, debug):
+    if debug:
+        logger.setLevel('DEBUG')
     if refresh_token:
         commander.init(refresh_token=refresh_token, depth=depth)
     elif username:
