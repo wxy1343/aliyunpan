@@ -257,16 +257,18 @@ class Printer(OutPut):
 
 
 class Bar(Printer):
-    def __init__(self, title=None):
+    def __init__(self, title=None, refresh_interval=0.3):
         super(Bar, self).__init__()
         self._title = title or self.__class__.__name__
-        self._upload_info = '{}{:<3s} [{}{}] {:.2%} {:.2f}{}/s'
+        self._upload_info = '{title}{:<3s} [{}{}] {:.2%} {:.2f}{unit}/s'
         self._ratio = 0.0
         self._start_time = time.time()
         self._time = time.time()
         self._average_speed = 0
         self._count = 0
-        self._refresh_time = 0
+        self._update_time = 0
+        self._unit = 'it'
+        self.refresh_interval = refresh_interval
 
     time = property(lambda self: time.time() - self._start_time)
     average_speed = property(lambda self: self._size / self.time if self.time else 0)
@@ -274,29 +276,63 @@ class Bar(Printer):
     def _get_average_speed(self, ratio, t):
         return (ratio - self._ratio) / t if t else 0
 
+    def _format(self, *args, **kwargs):
+        kwargs.setdefault('unit', self._unit)
+        speed, unit = str_of_size(self._average_speed, tuple_=True)
+        if not kwargs['unit']:
+            kwargs['unit'] = unit
+        return self._upload_info.format('.' * (4 - (self._count % 3 or 3)), '=' * int(self._ratio * 10),
+                                        '*' * (10 - int(self._ratio * 10)), self._ratio,
+                                        speed, title=self._title, *args, **kwargs)
+
     def update(self, ratio=None, refresh_line=False):
         self._count += 1
         t = 0
         if ratio is not None:
             t = time.time() - self._time
             self._time = time.time()
-            self._average_speed = self._get_average_speed(ratio, t)
-            self._ratio = ratio
-        if self._output and t and time.time() - self._refresh_time > 0.3:
-            self._refresh_time = time.time()
-            self.output = Info(
-                self._upload_info.format(self._title, '.' * (4 - (self._count % 3 or 3)), '=' * int(self._ratio * 10),
-                                         '*' * (10 - int(self._ratio * 10)), self._ratio,
-                                         *str_of_size(self._average_speed, tuple_=True)), refresh_line=refresh_line,
-                color=Fore.LIGHTMAGENTA_EX)
+            average_speed = self._get_average_speed(ratio, t)
+            if self._ratio != ratio and average_speed is not None:
+                self._average_speed = average_speed
+                self._ratio = ratio
+        if self._output and t and time.time() - self._update_time >= self.refresh_interval:
+            self._update_time = time.time()
+            upload_info = self._format()
+            self.output = Info(upload_info, refresh_line=refresh_line, color=Fore.LIGHTMAGENTA_EX)
+
+
+class GetFileListBar(Bar):
+    def __init__(self, max_depth, *args, **kwargs):
+        super(GetFileListBar, self).__init__(*args, **kwargs)
+        self._max_depth = max_depth
+        self._depth = 0
+        self._upload_info = '{title}{:<3s} [{}{}] {:.2%} [{depth}/{max_depth}] {:.2f}{unit}/s'
+        self._title = 'get_file_list'
+        self._time_out = 3
+        self.refresh_interval = 0
+        self._output = False
+
+    def update(self, depth=0, *args, **kwargs):
+        self._depth = depth
+        if self.time > self._time_out:
+            self._output = True
+        super(GetFileListBar, self).update(*args, **kwargs)
+
+    def _format(self, *args, **kwargs):
+        return super(GetFileListBar, self)._format(depth=self._depth, max_depth=self._max_depth, *args, **kwargs)
+
+    def _get_average_speed(self, ratio, t):
+        if t:
+            return super(GetFileListBar, self)._get_average_speed(ratio, t)
 
 
 class FileBar(Bar):
-    def __init__(self, title=None, size=0):
-        super(FileBar, self).__init__()
+    def __init__(self, title=None, size=0, *args, **kwargs):
+        super(FileBar, self).__init__(*args, **kwargs)
         self._file_size = 1024 * 1024
         self._title = title or self.__class__.__name__
         self._size = size
+        self._unit = None
         if self._size < self._file_size:
             self._output = False
 
@@ -305,20 +341,20 @@ class FileBar(Bar):
 
 
 class UploadBar(FileBar):
-    def __init__(self, size):
-        super(UploadBar, self).__init__(size=size)
+    def __init__(self, size, *args, **kwargs):
+        super(UploadBar, self).__init__(size=size, *args, **kwargs)
         self._title = self._upload_title
 
 
 class DownloadBar(FileBar):
-    def __init__(self, size):
-        super(DownloadBar, self).__init__(size=size)
+    def __init__(self, size, *args, **kwargs):
+        super(DownloadBar, self).__init__(size=size, *args, **kwargs)
         self._title = self._download_title
 
 
 class HashBar(FileBar):
-    def __init__(self, size):
-        super(HashBar, self).__init__(size=size)
+    def __init__(self, size, *args, **kwargs):
+        super(HashBar, self).__init__(size=size, *args, **kwargs)
         self._title = self._hash_title
         self._size = size
         self._time_out = 5
@@ -329,9 +365,6 @@ class HashBar(FileBar):
         if self.time > self._time_out:
             self._output = True
         super(HashBar, self).update(*args, **kwargs)
-
-    def refresh_line(self):
-        super(HashBar, self).refresh_line()
 
     def hash_info(self, *args, **kwargs):
         super(HashBar, self).hash_info(*args, **kwargs)

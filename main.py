@@ -6,10 +6,12 @@ from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
+__version__ = '2.2.2'
+
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='2.2.1')
+@click.version_option(version=__version__)
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=click.STRING, help='Specify REFRESH_TOKEN.')
@@ -18,6 +20,7 @@ from aliyunpan.exceptions import ConfigurationFileNotFoundError
 @click.option('-d', '--depth', type=click.INT, help='File recursion depth.', default=3, show_default=True)
 @click.option('--debug', is_flag=True, help='Debug mode.')
 def cli(config_file, refresh_token, username, password, depth, debug):
+    logger.info(f'Version:{__version__}')
     if debug:
         logger.setLevel('DEBUG')
     if refresh_token:

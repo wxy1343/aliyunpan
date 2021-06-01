@@ -4,6 +4,7 @@ from pathlib import Path, PurePosixPath
 from treelib import Tree
 
 from aliyunpan.api.type import FileInfo, ShareInfo
+from aliyunpan.common import GetFileListBar
 
 _all_ = ['PathList', 'parse_share_url']
 
@@ -15,22 +16,37 @@ class PathList:
         self._tree.create_node(tag='root', identifier='root')
         self.depth = 3
 
-    def update_path_list(self, file_id='root', depth=None, is_fid=True):
+    def update_path_list(self, file_id='root', depth=None, is_fid=True, **kwargs):
         if depth is None:
             depth = self.depth
+        kwargs.setdefault('max_depth', depth)
+        max_depth = kwargs['max_depth']
+        kwargs.setdefault('get_file_list_bar', GetFileListBar(max_depth))
+        kwargs.setdefault('ratio', 0)
+        get_file_list_bar = kwargs['get_file_list_bar']
+        ratio = kwargs['ratio']
+        get_file_list_bar.update(refresh_line=False)
         if not is_fid:
             file_id = self.get_path_fid(file_id, update=False)
         file_list = self._disk.get_file_list(file_id)
         if not file_list:
+            if depth == max_depth:
+                get_file_list_bar.refresh_line()
             return False
-        for info in file_list:
+        for i, info in enumerate(file_list):
+            if depth == max_depth:
+                ratio = (i + 1) / len(file_list) if file_list else None
+            get_file_list_bar.update(depth=max_depth - depth, ratio=ratio, refresh_line=True)
             file_info = self.get_file_info(info)[0]
             if self._tree.get_node(file_info.id):
                 self._tree.update_node(file_info.id, data=file_info)
             else:
                 self._tree.create_node(tag=file_info.name, identifier=file_info.id, data=file_info, parent=file_id)
             if not file_info.type and depth:
-                self.update_path_list(file_id=file_info.id, depth=depth - 1)
+                self.update_path_list(file_id=file_info.id, depth=depth - 1, max_depth=max_depth,
+                                      get_file_list_bar=get_file_list_bar, ratio=ratio)
+        if depth == max_depth:
+            get_file_list_bar.refresh_line()
         return True
 
     @staticmethod

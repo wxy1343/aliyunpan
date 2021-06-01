@@ -24,17 +24,20 @@ class Commander:
         self._task_config = Config(ROOT_DIR / Path('tasks.yaml'))
         self._share_link = 'aliyunpan://'
         self._print = Printer()
+        self._config_set = {'~/.config/aliyunpan.yaml', '.config/aliyunpan.yaml', '~/aliyunpan.yaml', 'aliyunpan.yaml',
+                            os.environ.get('ALIYUNPAN_CONF', '')}
         GLOBAL_VAR.tasks = self._task_config.read()
         GLOBAL_VAR.txt = ''
 
     def __del__(self):
         self._task_config.write(GLOBAL_VAR.tasks)
 
-    def init(self, config_file='~/.config/aliyunpan.yaml', refresh_token=None, username=None, password=None, depth=3):
+    def init(self, config_file=None, refresh_token=None, username=None, password=None, depth=3):
         self._path_list.depth = depth
-        specify_conf_file = os.environ.get("ALIYUNPAN_CONF", "")
+        if config_file:
+            self._config_set.add(config_file)
         config_file = list(
-            filter(lambda x: Path(x).is_file(), map(lambda x: Path(x).expanduser(), [specify_conf_file, config_file])))
+            filter(lambda x: Path(x).is_file(), map(lambda x: Path(x).expanduser(), self._config_set)))
         if refresh_token:
             if not len(refresh_token) == 32:
                 raise InvalidRefreshToken

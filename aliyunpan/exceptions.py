@@ -45,6 +45,15 @@ class InvalidConfiguration(ConfigurationFileError):
     """无效的配置文件"""
 
 
+class InvalidParameter(AliyunpanException):
+    pass
+
+
+class InvalidContentHash(InvalidParameter):
+    pass
+
+
 class AliyunpanCode(object):
     existed = 'AlreadyExist.File'
     token_invalid = 'AccessTokenInvalid'
+    invalid_content_hash = 'InvalidParameter.ContentHash'

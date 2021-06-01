@@ -10,7 +10,7 @@ from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
-from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed
+from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, InvalidContentHash
 
 __all__ = ['AliyunPan']
 
@@ -383,6 +383,7 @@ class AliyunPan(object):
             "upload_id": upload_id
         }
         r = self._req.post(url, json=json)
+        logger.debug(r.json())
         if r.status_code == 200:
             upload_bar.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
                                    refresh_line=True)
@@ -391,6 +392,8 @@ class AliyunPan(object):
             return r.json()['file_id']
         else:
             upload_bar.upload_info(path, status=False, refresh_line=True)
+            if 'code' in r.json() and r.json()['code'] == AliyunpanCode.invalid_content_hash:
+                raise InvalidContentHash
             return False
 
     def get_upload_url(self, path: str, upload_id: str, file_id: str, chunk_size: int, part_number: int = 1) -> list:
