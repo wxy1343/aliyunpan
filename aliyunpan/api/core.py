@@ -1,14 +1,16 @@
 import sys
 import time
-import requests
-import func_timeout
-from pathlib import Path
 from collections.abc import Iterable
+from pathlib import Path
+
+import func_timeout
+import requests
+
 from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
-from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode
+from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed
 
 __all__ = ['AliyunPan']
 
@@ -16,11 +18,12 @@ __all__ = ['AliyunPan']
 class AliyunPan(object):
 
     def __init__(self, refresh_token: str = None):
-        self._req = Req()
-        self._req.disk = self
+        self._req = Req(self)
         self._user_info = None
         self._access_token = None
         self._drive_id = None
+        self._username = None
+        self._password = None
         self._refresh_token = refresh_token
         self._access_token_gen_ = self._access_token_gen()
         self._drive_id_gen_ = self._drive_id_gen()
@@ -34,7 +37,7 @@ class AliyunPan(object):
     drive_id = property(lambda self: next(self._drive_id_gen_),
                         lambda self, value: setattr(self, '_drive_id', value))
 
-    def login(self, username: str, password: str):
+    def login(self, username: str = None, password: str = None):
         """
         登录api
         https://github.com/zhjc1124/aliyundrive
@@ -42,6 +45,16 @@ class AliyunPan(object):
         :param password:
         :return:
         """
+        if username:
+            self._username = username
+        else:
+            username = self._username
+        if password:
+            self._password = password
+        else:
+            password = self._password
+        if not username and not password:
+            raise LoginFailed
         password2 = encrypt(password)
         LOGIN = {
             'method': 'POST',
@@ -68,7 +81,7 @@ class AliyunPan(object):
             self._drive_id = drive_id
             GLOBAL_VAR.drive_id = drive_id
             return self._refresh_token
-        return False
+        raise LoginFailed
 
     def get_file_list(self, parent_file_id: str = 'root', next_marker: str = None) -> list:
         """
@@ -82,6 +95,7 @@ class AliyunPan(object):
         logger.info(f'Get the list of parent_file_id {parent_file_id}.')
         r = self._req.post(url, json=json)
         logger.debug(r.status_code)
+        logger.debug(r.json())
         if 'items' not in r.json():
             return []
         file_list = r.json()['items']
@@ -263,17 +277,18 @@ class AliyunPan(object):
             file_id = GLOBAL_VAR.tasks[content_hash].file_id
             self._chunk_size = GLOBAL_VAR.tasks[content_hash].chunk_size
             part_number = GLOBAL_VAR.tasks[content_hash].part_number
-            # 获取上传链接列表
-            part_info_list = self.get_upload_url(path, upload_id, file_id, self._chunk_size, part_number)
-            if not part_info_list:
-                # 重新上传
-                if str(path.absolute()) in path_list:
-                    # 删除未上传成功的任务
-                    del path_list[str(path.absolute())]
-                GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
-                return self.upload_file(parent_file_id=parent_file_id, path=path, upload_timeout=upload_timeout,
-                                        retry_num=retry_num, force=force, chunk_size=chunk_size, c=c)
-            elif part_info_list == AliyunpanCode.existed:
+            try:
+                # 获取上传链接列表
+                part_info_list = self.get_upload_url(path, upload_id, file_id, self._chunk_size, part_number)
+                if not part_info_list:
+                    # 重新上传
+                    if str(path.absolute()) in path_list:
+                        # 删除未上传成功的任务
+                        del path_list[str(path.absolute())]
+                    GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
+                    return self.upload_file(parent_file_id=parent_file_id, path=path, upload_timeout=upload_timeout,
+                                            retry_num=retry_num, force=force, chunk_size=chunk_size, c=c)
+            except FileExistsError:
                 # 漏网之鱼
                 self._print.upload_info(path, status=True, existed=True)
                 path_list.append(str(path.absolute()))
@@ -402,8 +417,8 @@ class AliyunPan(object):
             "upload_id": upload_id,
         }
         r = self._req.post(url, json=json)
-        if 'code' in r.json():
-            return r.json()['code']
+        if 'code' in r.json() and r.json()['code'] == AliyunpanCode.existed:
+            raise FileExistsError
         return r.json()['part_info_list'][part_number - 1:]
 
     def get_access_token(self) -> str:

@@ -1,5 +1,7 @@
 import os
+
 import requests
+
 from aliyunpan.api.core import AliyunPan
 from aliyunpan.api.models import *
 from aliyunpan.api.req import *
@@ -7,7 +9,7 @@ from aliyunpan.api.utils import *
 from aliyunpan.cli.config import Config
 from aliyunpan.cli.tui import AliyunpanTUI
 from aliyunpan.common import *
-from aliyunpan.exceptions import InvalidRefreshToken, InvalidPassword, LoginFailed, InvalidConfiguration, \
+from aliyunpan.exceptions import InvalidRefreshToken, InvalidPassword, InvalidConfiguration, \
     ConfigurationFileNotFoundError, AliyunpanCode
 
 __all__ = ['Commander']
@@ -40,8 +42,7 @@ class Commander:
         elif username:
             if not password:
                 raise InvalidPassword
-            if not self._disk.login(username, password):
-                raise LoginFailed
+            self._disk.login(username, password)
         elif config_file:
             self._config.config_file = config_file[0]
             refresh_token = self._config.get('refresh_token')
@@ -54,8 +55,7 @@ class Commander:
             elif username:
                 if not password:
                     raise InvalidPassword
-                if not self._disk.login(username, password):
-                    raise LoginFailed
+                self._disk.login(username, password)
             else:
                 raise InvalidConfiguration
         else:

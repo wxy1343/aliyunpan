@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import click
 from click_aliases import ClickAliasedGroup
+
 from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 from aliyunpan.exceptions import ConfigurationFileNotFoundError
@@ -8,7 +9,7 @@ from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
 @click.group(cls=ClickAliasedGroup)
 @click.help_option('-h', '--help')
-@click.version_option(version='2.2.0')
+@click.version_option(version='2.2.1')
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
 @click.option('-t', 'refresh_token', type=click.STRING, help='Specify REFRESH_TOKEN.')
