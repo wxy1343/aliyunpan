@@ -352,7 +352,10 @@ class AliyunPan(object):
                     f'(upload_id={upload_id}, file_id={file_id}, size={size}): Upload part of {part_number} to {upload_url}.')
                 try:
                     # 开始上传
-                    func_timeout.func_timeout(upload_timeout, lambda: self._req.put(upload_url, data=chunk))
+                    r = func_timeout.func_timeout(upload_timeout,
+                                                  lambda: self._req.put(upload_url, data=chunk, access_token=False))
+                    if r.status_code != 200:
+                        raise
                     break
                 except func_timeout.exceptions.FunctionTimedOut:
                     logger.warn('Upload timeout.')
@@ -374,7 +377,25 @@ class AliyunPan(object):
                 self._print.wait_info(refresh_line=True)
             k = part_number / part_info_list[-1]['part_number']
             upload_bar.update(ratio=k, refresh_line=True)
-        # 上传完成保存文件
+        try:
+            file_info = self.complete(file_id, upload_id)
+        except InvalidContentHash:
+            upload_bar.upload_info(path, status=False, refresh_line=True)
+            raise
+        if file_info:
+            upload_bar.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
+                                   refresh_line=True)
+            GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
+            GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
+            return file_info
+        else:
+            upload_bar.upload_info(path, status=False, refresh_line=True)
+            return False
+
+    def complete(self, file_id, upload_id):
+        """
+        上传成功保存文件
+        """
         url = 'https://api.aliyundrive.com/v2/file/complete'
         json = {
             "ignoreError": True,
@@ -384,17 +405,11 @@ class AliyunPan(object):
         }
         r = self._req.post(url, json=json)
         logger.debug(r.json())
+        if 'code' in r.json() and r.json()['code'] == AliyunpanCode.invalid_content_hash:
+            raise InvalidContentHash
         if r.status_code == 200:
-            upload_bar.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
-                                   refresh_line=True)
-            GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
-            GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
-            return r.json()['file_id']
-        else:
-            upload_bar.upload_info(path, status=False, refresh_line=True)
-            if 'code' in r.json() and r.json()['code'] == AliyunpanCode.invalid_content_hash:
-                raise InvalidContentHash
-            return False
+            return r.json()
+        return False
 
     def get_upload_url(self, path: str, upload_id: str, file_id: str, chunk_size: int, part_number: int = 1) -> list:
         """

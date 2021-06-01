@@ -195,13 +195,21 @@ class Commander:
                                     share_list.append(parse_share_url(line))
                         return self.upload_share(share_list, upload_path, force)
                     else:
+                        parent_file_id = self._path_list.get_path_fid(upload_path, update=False)
                         try:
-                            file_id = self._disk.upload_file(
-                                parent_file_id=self._path_list.get_path_fid(upload_path, update=False), path=path,
+                            result = self._disk.upload_file(
+                                parent_file_id=parent_file_id, path=path,
                                 upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
                         except KeyboardInterrupt:
                             self.__del__()
                             raise
+                        if isinstance(result, str):
+                            file_id = result
+                        else:
+                            file_info = self._path_list.get_file_info(result)[0]
+                            file_id = file_info.id
+                            self._path_list._tree.create_node(tag=file_info.name, identifier=file_info.id,
+                                                              parent=parent_file_id, data=file_info)
                         result_list.append(file_id)
                 elif path.is_dir():
                     if upload_path == 'root':
@@ -210,13 +218,21 @@ class Commander:
                     upload_file_list = self.upload_dir(path, upload_path)
                     for file in upload_file_list:
                         try:
+                            parent_file_id = self._path_list.get_path_fid(file[0], update=False)
                             result = self._disk.upload_file(
-                                parent_file_id=self._path_list.get_path_fid(file[0], update=False), path=file[1],
+                                parent_file_id=parent_file_id, path=file[1],
                                 upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
                         except KeyboardInterrupt:
                             self.__del__()
                             raise
-                        result_list.append(result)
+                        if isinstance(result, str):
+                            file_id = result
+                        else:
+                            file_info = self._path_list.get_file_info(result)[0]
+                            file_id = file_info.id
+                            self._path_list._tree.create_node(tag=file_info.name, identifier=file_info.id,
+                                                              parent=parent_file_id, data=file_info)
+                        result_list.append(file_id)
                 else:
                     raise FileNotFoundError
                 for file_hash, path in GLOBAL_VAR.file_set:
@@ -230,8 +246,6 @@ class Commander:
                                 pass
                             if not GLOBAL_VAR.tasks[file_hash].path:
                                 del GLOBAL_VAR.tasks[file_hash]
-        if len(result_list) == 1:
-            result_list = result_list[0]
         return result_list
 
     def upload_dir(self, path, upload_path):
@@ -423,10 +437,10 @@ class Commander:
             print('文件导入'.center(50, '*'))
             print(f'python main.py upload -s {file_name}')
             print('链接导入'.center(50, '*'))
-            file_id = self.upload(file_name)
+            file_id = self.upload(file_name)[0]
             print()
             if file_id:
-                self._path_list.update_path_list(depth=1)
+                self._path_list.update_path_list(depth=0)
                 file = self._path_list._tree.get_node(file_id).data
                 url = f'{self._share_link}{Path(path).name}|{file.content_hash}|{file.size}|root'
                 print(f'python main.py upload -s "{url}"')

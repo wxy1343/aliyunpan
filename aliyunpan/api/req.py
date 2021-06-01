@@ -59,9 +59,9 @@ class Req:
                     raise InvalidAccessToken
             except (KeyboardInterrupt, InvalidAccessToken, LoginFailed):
                 raise
-            except KeyError:
+            except (KeyError, json.decoder.JSONDecodeError):
                 pass
-            except Exception:
+            except:
                 logger.debug(sys.exc_info())
             return r
         except requests.exceptions.RequestException:
