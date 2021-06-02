@@ -46,23 +46,39 @@ class InvalidConfiguration(ConfigurationFileError):
 
 
 class InvalidParameter(AliyunpanException):
-    pass
+    """参数错误"""
 
 
 class InvalidContentHash(InvalidParameter):
-    pass
+    """Hash不匹配"""
 
 
-class AliyunpanExpired(AliyunpanException):
-    pass
+class RequestExpired(AliyunpanException):
+    """请求过期"""
 
 
-class RequestExpired(AliyunpanExpired):
-    pass
+class UploadUrlExpired(RequestExpired):
+    """上传链接过期"""
 
 
-class UploadUrlFailedRefresh(AliyunpanExpired):
-    pass
+class UploadUrlFailedRefresh(UploadUrlExpired):
+    """上传链接刷新失败"""
+
+
+class BadResponseCode(AliyunpanException):
+    """错误的响应代码"""
+
+
+class InvalidPartNumber(InvalidParameter):
+    """分块数量错误"""
+
+
+class PartNumberOverLimit(InvalidPartNumber):
+    """分块上限"""
+
+    def __str__(self):
+        return self.message or '\nPart Number must be an integer between 1 and 10000, inclusive.\n' \
+                               'Please increase the size of chunk_size.'
 
 
 class AliyunpanCode(object):

@@ -6,7 +6,7 @@ from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
-__version__ = '2.2.3'
+__version__ = '2.2.4'
 
 
 @click.group(cls=ClickAliasedGroup)
@@ -81,7 +81,7 @@ def mv(path, target_path):
 @click.option('-r', '--retry', type=click.INT, help='number of retries.', default=3, show_default=True)
 @click.option('-f', '--force', is_flag=True, help='Force overlay file.')
 @click.option('-s', '--share', is_flag=True, help='Specify the shared sequence file.')
-@click.option('-cs', '--chunk-size', type=click.INT, help='Chunk size(byte).', default=524288, show_default=True)
+@click.option('-cs', '--chunk-size', type=click.INT, help='Chunk size(byte).')
 @click.option('-c', is_flag=True, help='Breakpoint continuation.')
 def upload(path, file, upload_path, time_out, retry, force, share, chunk_size, c):
     if not path and not file:

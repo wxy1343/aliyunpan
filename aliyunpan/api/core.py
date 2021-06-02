@@ -3,7 +3,6 @@ import time
 from collections.abc import Iterable
 from pathlib import Path
 
-import func_timeout
 import requests
 
 from aliyunpan.api.req import *
@@ -11,7 +10,7 @@ from aliyunpan.api.type import UserInfo
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, \
-    InvalidContentHash, RequestExpired, UploadUrlFailedRefresh
+    InvalidContentHash, UploadUrlExpired, UploadUrlFailedRefresh, PartNumberOverLimit, BadResponseCode
 
 __all__ = ['AliyunPan']
 
@@ -239,11 +238,18 @@ class AliyunPan(object):
         self._chunk_size = chunk_size or self._chunk_size
         # 获取sha1
         content_hash = get_sha1(path, self._chunk_size)
-        # 分片列表
-        part_info_list = []
-        count = int(file_size / self._chunk_size) + 1
-        for i in range(count):
-            part_info_list.append({"part_number": i + 1})
+        while True:
+            # 分片列表
+            part_info_list = []
+            count = int(file_size / self._chunk_size) + 1
+            for i in range(count):
+                part_info_list.append({"part_number": i + 1})
+            if len(part_info_list) > 10000:
+                if chunk_size:
+                    raise PartNumberOverLimit
+                self._chunk_size = int(file_size / 1000)
+                continue
+            break
         json = {"size": file_size, "part_info_list": part_info_list, "content_hash": content_hash}
         path_list = []
         existed = False
@@ -354,16 +360,17 @@ class AliyunPan(object):
                     f'(upload_id={upload_id}, file_id={file_id}, size={size}): Upload part of {part_number} to {upload_url}.')
                 try:
                     # 开始上传
-                    r = func_timeout.func_timeout(upload_timeout,
-                                                  lambda: self._req.put(upload_url, data=chunk, access_token=False))
+                    r = self._req.put(upload_url, data=chunk, timeout=upload_timeout, access_token=False)
                     if r.status_code == AliyunpanCode.request_expired:
-                        raise RequestExpired
+                        raise UploadUrlExpired
                     elif r.status_code == AliyunpanCode.part_already_exist:
                         pass
                     elif r.status_code != 200:
-                        raise
+                        logger.error(r.status_code)
+                        raise BadResponseCode
                     break
-                except func_timeout.exceptions.FunctionTimedOut:
+                except (requests.exceptions.SSLError, requests.exceptions.ConnectionError,
+                        requests.exceptions.ReadTimeout):
                     logger.warn('Upload timeout.')
                     if retry_count is retry_num:
                         self._print.error_info(f'上传超时{retry_num}次，即将重新上传', refresh_line=True)
@@ -375,7 +382,7 @@ class AliyunPan(object):
                     time.sleep(1)
                 except KeyboardInterrupt:
                     raise
-                except RequestExpired:
+                except UploadUrlExpired:
                     info = f'Part {part_number} upload request has expired.'
                     logger.warning(info)
                     self._print.error_info(info, refresh_line=True)
