@@ -53,7 +53,21 @@ class InvalidContentHash(InvalidParameter):
     pass
 
 
+class AliyunpanExpired(AliyunpanException):
+    pass
+
+
+class RequestExpired(AliyunpanExpired):
+    pass
+
+
+class UploadUrlFailedRefresh(AliyunpanExpired):
+    pass
+
+
 class AliyunpanCode(object):
     existed = 'AlreadyExist.File'
     token_invalid = 'AccessTokenInvalid'
     invalid_content_hash = 'InvalidParameter.ContentHash'
+    request_expired = 403
+    part_already_exist = 409

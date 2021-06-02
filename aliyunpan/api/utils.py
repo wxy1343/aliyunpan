@@ -3,10 +3,11 @@ import hashlib
 import json
 import logging
 import os
-import rsa
 import sys
 
-__all__ = ['ROOT_DIR', 'logger', 'get_sha1', 'str_of_size', 'encrypt', 'parse_biz_ext']
+import rsa
+
+__all__ = ['ROOT_DIR', 'logger', 'get_sha1', 'str_of_size', 'Iter', 'encrypt', 'parse_biz_ext']
 
 ROOT_DIR = os.path.dirname(os.path.realpath(sys.argv[0]))
 LOG_LEVEL = logging.INFO
@@ -59,6 +60,18 @@ def str_of_size(size, decimal=3, tuple_=False):
     if tuple_:
         return size, units[level]
     return f'{size}{units[level]}'
+
+
+class Iter:
+
+    def __init__(self, IterObj):
+        self.iter = IterObj
+
+    def __getitem__(self, index):
+        return self.iter[index]
+
+    def __len__(self):
+        return len(self.iter)
 
 
 # RSA encrypt

@@ -10,7 +10,8 @@ from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
-from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, InvalidContentHash
+from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, \
+    InvalidContentHash, RequestExpired, UploadUrlFailedRefresh
 
 __all__ = ['AliyunPan']
 
@@ -335,6 +336,7 @@ class AliyunPan(object):
         upload_bar.upload_info(path)
         upload_bar.update(refresh_line=False)
         logger.debug(f'upload_id: {upload_id}, file_id: {file_id}, part_info_list: {part_info_list}')
+        part_info_list = Iter(part_info_list)
         for i in part_info_list:
             part_number, upload_url = i['part_number'], i['upload_url']
             GLOBAL_VAR.tasks[content_hash].part_number = part_number
@@ -354,7 +356,11 @@ class AliyunPan(object):
                     # 开始上传
                     r = func_timeout.func_timeout(upload_timeout,
                                                   lambda: self._req.put(upload_url, data=chunk, access_token=False))
-                    if r.status_code != 200:
+                    if r.status_code == AliyunpanCode.request_expired:
+                        raise RequestExpired
+                    elif r.status_code == AliyunpanCode.part_already_exist:
+                        pass
+                    elif r.status_code != 200:
                         raise
                     break
                 except func_timeout.exceptions.FunctionTimedOut:
@@ -369,6 +375,23 @@ class AliyunPan(object):
                     time.sleep(1)
                 except KeyboardInterrupt:
                     raise
+                except RequestExpired:
+                    info = f'Part {part_number} upload request has expired.'
+                    logger.warning(info)
+                    self._print.error_info(info, refresh_line=True)
+                    time.sleep(1)
+                    part_info_list_ = self.get_upload_url(path=path, upload_id=upload_id, file_id=file_id,
+                                                          chunk_size=chunk_size,
+                                                          part_number=GLOBAL_VAR.tasks[content_hash].part_number)
+                    if part_info_list_:
+                        part_info_list.iter = part_info_list_
+                        part_info = [i for i in part_info_list if i['part_number'] == part_number][0]
+                        upload_url = part_info['upload_url']
+                        logger.info(f'The upload_url of Part {part_number} has been refreshed.')
+                        logger.debug(upload_url)
+                    else:
+                        logger.error(f'The upload_url of Part {part_number} failed to refresh.')
+                        raise UploadUrlFailedRefresh
                 except:
                     logger.error(sys.exc_info())
                     exc_type, exc_value, exc_traceback = sys.exc_info()
