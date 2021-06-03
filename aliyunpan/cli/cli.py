@@ -112,20 +112,29 @@ class Commander:
         return file_id
 
     def mv(self, path, target_path):
+        path = AliyunpanPath(path)
+        target_path = AliyunpanPath(target_path)
         file_id = self._path_list.get_path_fid(path, update=False)
-        _ = self._disk.move_file(self._path_list.get_path_fid(path, update=False),
-                                 self._path_list.get_path_fid(target_path, update=False))
-        if _ and file_id:
-            self._print.move_info(path, target_path, status=True)
-            self._path_list._tree.remove_node(file_id)
-            self._path_list.update_path_list(Path(target_path) / path, is_fid=False)
-        else:
-            self._print.move_info(path, target_path, status=False)
-        return _
+        target_file_id = self._path_list.get_path_fid(target_path, update=False)
+        target_file_node = self._path_list._tree.get_node(target_file_id)
+        if target_file_id and target_file_node:
+            if target_file_node.data.type:
+                raise FileExistsError
+            else:
+                _ = self._disk.move_file(file_id, target_file_id)
+                if _ and file_id:
+                    self._print.move_info(path, target_path, status=True)
+                    self._path_list._tree.remove_node(file_id)
+                    self._path_list.update_path_list(Path(target_path) / path, is_fid=False)
+                else:
+                    self._print.move_info(path, target_path, status=False)
+                return _
+        elif path.parent == target_path.parent:
+            self.rename(path, target_path.name)
 
     def mkdir(self, path):
         file_id_list = []
-        path = PurePosixPath(Path(path).as_posix())
+        path = AliyunpanPath(path)
         if str(path) == 'root':
             return file_id_list
         file_id = self._path_list.get_path_fid(path, update=False)
@@ -149,14 +158,14 @@ class Commander:
 
     def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False, share=False, chunk_size=None,
                c=False):
-        if isinstance(path, str):
+        if isinstance(path, (str, AliyunpanPath)):
             path_list = (path,)
         else:
             path_list = path
         result_list = []
         for path in path_list:
             if path:
-                if self._share_link in path:
+                if self._share_link in str(path):
                     share_list = []
                     if share:
                         share_info = parse_share_url(path)
@@ -265,7 +274,7 @@ class Commander:
             share_info_list = [share_info_list]
         if upload_path == 'root':
             upload_path = ''
-        upload_path = PurePosixPath(Path(upload_path).as_posix())
+        upload_path = AliyunpanPath(upload_path)
         folder_list = []
         file_list = []
         file_id_list = None
@@ -274,7 +283,7 @@ class Commander:
             if str(upload_path) in ('', '.') and str(path) == 'root':
                 path = Path('')
             if str(upload_path) == 'root':
-                upload_path = PurePosixPath('')
+                upload_path = AliyunpanPath()
             p = upload_path / path
             if str(p) not in ('', '.'):
                 file_id_list = self.mkdir(upload_path / path)
@@ -285,11 +294,11 @@ class Commander:
         for share_info in share_info_list:
             path = share_info.path
             if str(upload_path) in ('', '.') and str(path) == 'root':
-                path = Path('')
+                path = Path()
             parent_file_id = self._path_list.get_path_fid(upload_path / path)
             result = self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.content_hash_name,
                                                 share_info.size, parent_file_id, force)
-            p = PurePosixPath(Path(upload_path / path / share_info.name).as_posix())
+            p = AliyunpanPath(upload_path / path / share_info.name)
             file_list.append((result, p))
             if result:
                 self._print.upload_info(p, status=True, rapid_upload=True)
@@ -330,8 +339,8 @@ class Commander:
                     except FileNotFoundError:
                         pass
                 continue
-            if isinstance(path, (Path, PurePosixPath, str)):
-                path = PurePosixPath(Path(path).as_posix())
+            if isinstance(path, (Path, PurePosixPath, AliyunpanPath, str)):
+                path = AliyunpanPath(path)
                 node = self._path_list.get_path_node(path, update=False)
                 if not node:
                     raise FileNotFoundError(path)

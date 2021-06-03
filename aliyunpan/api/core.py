@@ -10,7 +10,8 @@ from aliyunpan.api.type import UserInfo
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, \
-    InvalidContentHash, UploadUrlExpired, UploadUrlFailedRefresh, PartNumberOverLimit, BadResponseCode
+    InvalidContentHash, UploadUrlExpired, UploadUrlFailedRefresh, PartNumberOverLimit, BadResponseCode, \
+    PartNotSequential
 
 __all__ = ['AliyunPan']
 
@@ -294,7 +295,7 @@ class AliyunPan(object):
                         del path_list[str(path.absolute())]
                     GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
                     return self.upload_file(parent_file_id=parent_file_id, path=path, upload_timeout=upload_timeout,
-                                            retry_num=retry_num, force=force, chunk_size=chunk_size, c=c)
+                                            retry_num=retry_num, force=force, chunk_size=self._chunk_size, c=c)
             except FileExistsError:
                 # 漏网之鱼
                 self._print.upload_info(path, status=True, existed=True)
@@ -337,14 +338,15 @@ class AliyunPan(object):
                 task_info['file_id'] = file_id
                 task_info['part_number'] = 1
                 GLOBAL_VAR.tasks[content_hash] = task_info
-        file_size_ = file_size - part_info_list[0]['part_number'] * self._chunk_size
-        upload_bar = UploadBar(size=file_size if file_size_ < 0 else file_size_)
+        upload_bar = UploadBar(size=file_size)
         upload_bar.upload_info(path)
         upload_bar.update(refresh_line=False)
         logger.debug(f'upload_id: {upload_id}, file_id: {file_id}, part_info_list: {part_info_list}')
         part_info_list = Iter(part_info_list)
         for i in part_info_list:
             part_number, upload_url = i['part_number'], i['upload_url']
+            if not upload_url:
+                continue
             GLOBAL_VAR.tasks[content_hash].part_number = part_number
             # 分块读取
             with path.open('rb') as f:
@@ -365,6 +367,8 @@ class AliyunPan(object):
                         raise UploadUrlExpired
                     elif r.status_code == AliyunpanCode.part_already_exist:
                         pass
+                    elif r.status_code == AliyunpanCode.part_not_sequential:
+                        raise PartNotSequential
                     elif r.status_code != 200:
                         logger.error(r.status_code)
                         raise BadResponseCode
@@ -376,7 +380,7 @@ class AliyunPan(object):
                         self._print.error_info(f'上传超时{retry_num}次，即将重新上传', refresh_line=True)
                         time.sleep(1)
                         return self.upload_file(parent_file_id=parent_file_id, path=path, upload_timeout=upload_timeout,
-                                                retry_num=retry_num, force=force, chunk_size=chunk_size, c=c)
+                                                retry_num=retry_num, force=force, chunk_size=self._chunk_size, c=c)
                     self._print.error_info('上传超时', refresh_line=True)
                     retry_count += 1
                     time.sleep(1)
@@ -388,8 +392,7 @@ class AliyunPan(object):
                     self._print.error_info(info, refresh_line=True)
                     time.sleep(1)
                     part_info_list_ = self.get_upload_url(path=path, upload_id=upload_id, file_id=file_id,
-                                                          chunk_size=chunk_size,
-                                                          part_number=GLOBAL_VAR.tasks[content_hash].part_number)
+                                                          chunk_size=self._chunk_size)
                     if part_info_list_:
                         part_info_list.iter = part_info_list_
                         part_info = [i for i in part_info_list if i['part_number'] == part_number][0]
@@ -399,13 +402,15 @@ class AliyunPan(object):
                     else:
                         logger.error(f'The upload_url of Part {part_number} failed to refresh.')
                         raise UploadUrlFailedRefresh
+                except (BadResponseCode, PartNotSequential):
+                    raise
                 except:
                     logger.error(sys.exc_info())
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     self._print.error_info(exc_type.__name__, refresh_line=True)
                     time.sleep(1)
                 self._print.wait_info(refresh_line=True)
-            k = part_number / part_info_list[-1]['part_number']
+            k = part_number / len(part_info_list)
             upload_bar.update(ratio=k, refresh_line=True)
         try:
             file_info = self.complete(file_id, upload_id)
@@ -467,7 +472,10 @@ class AliyunPan(object):
         r = self._req.post(url, json=json)
         if 'code' in r.json() and r.json()['code'] == AliyunpanCode.existed:
             raise FileExistsError
-        return r.json()['part_info_list'][part_number - 1:]
+        part_info_list = r.json()['part_info_list']
+        for i in part_info_list[:part_number - 1]:
+            i['upload_url'] = ''
+        return part_info_list
 
     def get_access_token(self) -> str:
         """

@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path, PurePosixPath
 
@@ -6,14 +7,14 @@ from treelib import Tree
 from aliyunpan.api.type import FileInfo, ShareInfo
 from aliyunpan.common import GetFileListBar
 
-_all_ = ['PathList', 'parse_share_url']
+_all_ = ['PathList', 'parse_share_url', 'AliyunpanPath']
 
 
 class PathList:
     def __init__(self, disk):
         self._tree = Tree()
         self._disk = disk
-        self._tree.create_node(tag='root', identifier='root')
+        self._tree.create_node(tag='root', identifier='root', data=FileInfo(type=False))
         self.depth = 3
 
     def update_path_list(self, file_id='root', depth=None, is_fid=True, **kwargs):
@@ -78,12 +79,12 @@ class PathList:
             file_info_list.append(file_info)
         return file_info_list
 
-    def tree(self, path='root'):
+    def tree(self, path='root', stdout=sys.stdout):
         file_id = self.get_path_fid(path, update=False)
         self.update_path_list(file_id)
         if not file_id:
             raise FileNotFoundError(path)
-        self._tree.show(file_id)
+        return self._tree.show(file_id, stdout=stdout)
 
     def get_path_list(self, path, update=True):
         file_id = self.get_path_fid(path, update=update)
@@ -98,11 +99,11 @@ class PathList:
         return [i.data for i in self._tree.children(file_id)]
 
     def get_path_fid(self, path, file_id='root', update=True):
-        path = PurePosixPath(Path(path).as_posix())
+        path = AliyunpanPath(path)
         if str(path) in ('', '/', '\\', '.', 'root'):
             return 'root'
         flag = False
-        path_list = list(filter(None, str(path).split('/')))
+        path_list = list(filter(None, path.split()))
         if path_list[0] == 'root':
             path_list = path_list[1:]
         for i in path_list:
@@ -154,3 +155,24 @@ def parse_share_url(url):
     share_info = ShareInfo(name=name, content_hash=content_hash, content_hash_name=content_hash_name, size=size,
                            path=Path(path.strip()))
     return share_info
+
+
+class AliyunpanPath(type(Path())):
+    def __str__(self):
+        path = [i for i in str(PurePosixPath(Path(super().__str__()).as_posix())).split('/') if i != '']
+        if not path:
+            path = ['root']
+        if len(path) != 1 and path[0] == 'root':
+            path = path[1:]
+        path = '/'.join(path)
+        return path
+
+    def split(self):
+        return self.__str__().split('/')
+
+    def __eq__(self, other):
+        if self.__str__() == other.__str__():
+            return True
+
+    def __hash__(self):
+        return self.__str__()

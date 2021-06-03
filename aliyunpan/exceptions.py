@@ -81,9 +81,18 @@ class PartNumberOverLimit(InvalidPartNumber):
                                'Please increase the size of chunk_size.'
 
 
+class PartNotSequential(AliyunpanException):
+    """上传序列错误"""
+
+    def __str__(self):
+        return self.message or 'For sequential multipart upload,' \
+                               'you must upload or complete parts with sequential part number.'
+
+
 class AliyunpanCode(object):
     existed = 'AlreadyExist.File'
     token_invalid = 'AccessTokenInvalid'
     invalid_content_hash = 'InvalidParameter.ContentHash'
     request_expired = 403
     part_already_exist = 409
+    part_not_sequential = 400
