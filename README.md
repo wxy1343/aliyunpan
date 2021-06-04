@@ -54,6 +54,7 @@ echo "password: 'xxxxx'"  >>  ~/.config/aliyunpan.yaml
 |cat (c)             |显示文件内容                    |
 |tui                 |文本用户界面                    |
 |search              |搜索文件/文件夹                 |
+|sync                |同步文件夹                     |
 
 ## 使用指南
 
@@ -169,12 +170,12 @@ python main.py COMMAND -h
                 <td>选择文件(多个)</td>
             </tr>        
             <tr>
-                <td>upload</td>
+                <td>upload,sync</td>
                 <td>-t, --time-out</td>
                 <td>分块上传超时时间(秒)</td>
             </tr>        
             <tr>
-                <td>upload</td>
+                <td>upload,sync</td>
                 <td>-r, --retry</td>
                 <td>上传失败重试次数</td>
             </tr>        
@@ -189,7 +190,7 @@ python main.py COMMAND -h
                 <td>指定分享的序列文件</td>
             </tr> 
             <tr>
-                <td>upload</td>
+                <td>upload,sync</td>
                 <td>-cs, --chunk-size</td>
                 <td>分块大小(字节)</td>
             </tr> 
@@ -202,6 +203,11 @@ python main.py COMMAND -h
                 <td>cat</td>
                 <td>-e, --encoding</td>
                 <td>文件编码</td>
+            </tr>        
+            <tr>
+                <td>sync</td>
+                <td>--sync-time</td>
+                <td>同步间隔时间</td>
             </tr>
         </tbody>
     </table>

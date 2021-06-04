@@ -158,7 +158,7 @@ class Commander:
 
     def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False, share=False, chunk_size=None,
                c=False):
-        if isinstance(path, (str, AliyunpanPath)):
+        if isinstance(path, (str, AliyunpanPath, Path)):
             path_list = (path,)
         else:
             path_list = path
@@ -261,6 +261,7 @@ class Commander:
         upload_path = upload_path / path.name
         if not self._path_list.get_path_fid(upload_path, update=False):
             self.mkdir(upload_path)
+            self._print.print_line()
         upload_file_list = []
         for file in path.iterdir():
             if file.is_dir():
@@ -300,6 +301,7 @@ class Commander:
                                                 share_info.size, parent_file_id, force)
             p = AliyunpanPath(upload_path / path / share_info.name)
             file_list.append((result, p))
+            self._print.print_line()
             if result:
                 self._print.upload_info(p, status=True, rapid_upload=True)
             else:
@@ -355,6 +357,7 @@ class Commander:
                 if single_file:
                     p = save_path / p.name
                 self._print.download_info(p)
+                self._print.print_line()
                 self.download_file(p, file_node.download_url, chunk_size)
             else:
                 self.download(self._path_list.get_fid_list(file_node.id), save_path / p.name)
@@ -374,6 +377,7 @@ class Commander:
             r = self._req.get(url, headers=headers, stream=True)
             file_size = int(r.headers['Content-Length'])
             if temp_size == file_size and file_size != 0:
+                self._print.print_line()
                 self._print.download_info(path, status=True)
                 return True
             elif temp_size > file_size:
@@ -392,9 +396,11 @@ class Commander:
                         f.write(chunk)
         except requests.exceptions.RequestException:
             self._print.download_info(path, status=False)
+            self._print.print_line()
             return False
         self._print.download_info(path, status=True, t=download_bar.time, average_speed=download_bar.average_speed,
                                   refresh_line=True)
+        self._print.print_line()
         return True
 
     def cat(self, path, encoding='utf-8'):
@@ -457,3 +463,63 @@ class Commander:
     def tui(self):
         aliyunpan_tui = AliyunpanTUI(self)
         aliyunpan_tui.run()
+
+    def sync(self, path, upload_path, sync_time, time_out, chunk_size, retry):
+        self._print.refresh_line()
+        path = AliyunpanPath(path)
+        relative_path = AliyunpanPath(path.name)
+        upload_path = AliyunpanPath(upload_path)
+        p = upload_path / relative_path
+        self._path_list.update_path_list(p, is_fid=False)
+        file_id = self._path_list.get_path_fid(p, update=False)
+        if not file_id:
+            self.upload(path, upload_path, timeout=time_out, chunk_size=chunk_size, retry=retry)
+            self._path_list.update_path_list(p, is_fid=False)
+            file_id = self._path_list.get_path_fid(p, update=False)
+        path_ = self._path_list._tree.to_dict(file_id, with_data=True)[str(relative_path)]
+        change_file_list = self.check_path(path, path_['children'] if 'children' in path_ else [])
+        for path_ in change_file_list:
+            relative_path = path.name / (path - path_)
+            if path_.exists():
+                if path_.is_file():
+                    self.upload(path_, upload_path / relative_path.parent, force=True, timeout=time_out,
+                                chunk_size=chunk_size, retry=retry)
+                else:
+                    self.upload(path_, upload_path / relative_path.parent, timeout=time_out, chunk_size=chunk_size,
+                                retry=retry)
+            else:
+                self.rm(upload_path / relative_path)
+        if sync_time:
+            if len(change_file_list):
+                self._print.print_line()
+            self._print.wait_info('等待{time}秒后再次同步', t=sync_time, refresh_line=True)
+            self.sync(path, upload_path, sync_time, time_out, chunk_size, retry)
+
+    def check_path(self, local_path, disk_path_list):
+        p = Path(local_path)
+        change_file_list = []
+        for path in p.iterdir():
+            flag = False
+            for i, path_ in enumerate(disk_path_list, 1):
+                name, file_info = list(path_.items())[0]
+                if p / name not in p.iterdir():
+                    change_file_list.append(p / name)
+                if Path(path) == p / name:
+                    if 'children' in file_info and Path(path).is_dir() and \
+                            Path(path).is_dir() != file_info['data'].type:
+                        children = file_info['children']
+                        change_file_list.extend(self.check_path(p / name, children))
+                    if file_info and path.is_file() == file_info['data'].type:
+                        if path.is_file() and get_sha1(path).lower() != file_info['data'].content_hash.lower():
+                            continue
+                        flag = True
+                if not flag and i == len(disk_path_list):
+                    change_file_list.append(path)
+        if not len(list(p.iterdir())):
+            for path_ in disk_path_list:
+                name, file_info = list(path_.items())[0]
+                change_file_list.append(p / name)
+        if not len(disk_path_list):
+            for path_ in p.iterdir():
+                change_file_list.append(path_)
+        return list(set(change_file_list))

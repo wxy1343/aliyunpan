@@ -6,7 +6,7 @@ from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
-__version__ = '2.2.5'
+__version__ = '2.3.0'
 
 
 @click.group(cls=ClickAliasedGroup)
@@ -143,6 +143,18 @@ def share(path, file_id, expire_sec, share_link, download_link, save):
 @click.option('-e', '--encoding', type=click.STRING, default='utf-8', show_default=True)
 def cat(path, encoding):
     click.echo(commander.cat(path, encoding))
+
+
+@cli.command(aliases=['sync'], help='Synchronize files.')
+@click.help_option('-h', '--help')
+@click.argument('path', type=click.Path())
+@click.argument('upload_path', default='root')
+@click.option('-cs', '--chunk-size', type=click.INT, help='Chunk size(byte).')
+@click.option('-t', '--time-out', type=click.FLOAT, help='Chunk upload timeout(sec).', default=10.0, show_default=True)
+@click.option('-r', '--retry', type=click.INT, help='number of retries.', default=3, show_default=True)
+@click.option('--sync-time', type=click.FLOAT, help='Synchronization interval time(sec).')
+def sync(path, upload_path, time_out, chunk_size, retry, sync_time):
+    commander.sync(path, upload_path, sync_time, time_out, chunk_size, retry)
 
 
 @cli.command(aliases=['tui'], help='Text-based User Interface.')

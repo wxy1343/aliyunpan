@@ -134,6 +134,7 @@ class OutPutSingleton(OutPut):
         super(OutPutSingleton, self).__init__()
         self._print = self._output_gen()
         self._print.__next__()
+        self.print_line = False
 
     def __del__(self):
         self._stdout.write('\n')
@@ -145,12 +146,15 @@ class OutPutSingleton(OutPut):
         while True:
             info = yield
             with self._lock:
+                if self.print_line:
+                    self._stdout.write('\n')
+                    self.print_line = False
                 if last_info:
                     if info.refresh_line:
                         if len(last_info) > len(info):
                             self._stdout.write('\r' + len(last_info) * ' ')
                     else:
-                        self._stdout.write('\n')
+                        self.print_line = True
                 if info.error:
                     self._stderr.write(str(info))
                 else:
@@ -183,11 +187,12 @@ class Printer(OutPut):
         self._rename_color = Fore.LIGHTBLUE_EX
         self._wait_color = Fore.MAGENTA
         self._error_color = Fore.RED
-        self._print = OutPutSingleton().output
+        self._print = OutPutSingleton()
         self._hash_size = 1024 ** 3
         self._output = True
 
-    output = property(lambda self: self._print, lambda self, value: self._print.send(value) if self._output else None)
+    output = property(lambda self: self._print.output,
+                      lambda self, value: self._print.output.send(value) if self._output else None)
 
     def get_info(self, status, path, *args, existed=False, target_path=None, refresh_line=False):
         path_info = str(path) + self._link_info + str(target_path) if target_path else str(path)
@@ -206,9 +211,10 @@ class Printer(OutPut):
         self.output = Info(self._error_info.format(info), color=self._error_color, error=True,
                            refresh_line=refresh_line)
 
-    def wait_info(self, t=3, refresh_line=False):
+    def wait_info(self, title=None, t=3, refresh_line=False):
         while t:
-            self.output = Info(f'{t}秒后重试', color=self._wait_color, refresh_line=refresh_line)
+            self.output = Info((title or '{time}秒后重试').format(time=t), color=self._wait_color,
+                               refresh_line=refresh_line)
             t -= 1
             time.sleep(1)
 
@@ -254,6 +260,9 @@ class Printer(OutPut):
 
     def refresh_line(self):
         self.output = Info(refresh_line=True)
+
+    def print_line(self):
+        self._print.print_line = True
 
 
 class Bar(Printer):

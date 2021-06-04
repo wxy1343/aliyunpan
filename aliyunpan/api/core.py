@@ -276,6 +276,7 @@ class AliyunPan(object):
             if existed and flag and c:
                 # 已存在跳过上传
                 self._print.upload_info(path, status=True, existed=True)
+                self._print.print_line()
                 GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
                 GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
                 return GLOBAL_VAR.tasks[content_hash].file_id
@@ -299,6 +300,7 @@ class AliyunPan(object):
             except FileExistsError:
                 # 漏网之鱼
                 self._print.upload_info(path, status=True, existed=True)
+                self._print.print_line()
                 path_list.append(str(path.absolute()))
                 path_list = list(set(path_list))
                 GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
@@ -319,6 +321,7 @@ class AliyunPan(object):
             # 快速上传成功
             if rapid_upload:
                 self._print.upload_info(path, status=True, rapid_upload=True)
+                self._print.print_line()
                 file_id = r.json()['file_id']
                 task_info['file_id'] = file_id
                 task_info['upload_time'] = time.time()
@@ -416,15 +419,18 @@ class AliyunPan(object):
             file_info = self.complete(file_id, upload_id)
         except InvalidContentHash:
             upload_bar.upload_info(path, status=False, refresh_line=True)
+            self._print.print_line()
             raise
         if file_info:
             upload_bar.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
                                    refresh_line=True)
+            self._print.print_line()
             GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
             GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
             return file_info
         else:
             upload_bar.upload_info(path, status=False, refresh_line=True)
+            self._print.print_line()
             return False
 
     def complete(self, file_id, upload_id):

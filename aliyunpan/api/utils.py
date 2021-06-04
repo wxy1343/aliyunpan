@@ -22,7 +22,7 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
-def get_sha1(path, split_size):
+def get_sha1(path, split_size=524288):
     logger.info(f'Calculate sha1 of file {path}.')
     file_size = os.path.getsize(path)
     from aliyunpan.common import HashBar

@@ -176,3 +176,17 @@ class AliyunpanPath(type(Path())):
 
     def __hash__(self):
         return self.__str__()
+
+    def __sub__(self, other: Path):
+        parts = []
+        parts1 = self.parts
+        parts2 = other.parts
+        if len(other.parts) > len(self.parts):
+            parts1, parts2 = parts2, parts1
+        for i, j in enumerate(parts1):
+            if len(parts2) >= i + 1:
+                if j != other.parts[i]:
+                    parts.append(j)
+            else:
+                parts.append(j)
+        return AliyunpanPath('/'.join(parts))
