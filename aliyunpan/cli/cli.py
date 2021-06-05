@@ -212,14 +212,15 @@ class Commander:
                         except KeyboardInterrupt:
                             self.__del__()
                             raise
-                        if isinstance(result, str):
-                            file_id = result
-                        else:
-                            file_info = self._path_list.get_file_info(result)[0]
-                            file_id = file_info.id
-                            self._path_list._tree.create_node(tag=file_info.name, identifier=file_info.id,
-                                                              parent=parent_file_id, data=file_info)
-                        result_list.append(file_id)
+                        if result:
+                            if isinstance(result, str):
+                                file_id = result
+                            else:
+                                file_info = self._path_list.get_file_info(result)[0]
+                                file_id = file_info.id
+                                self._path_list._tree.create_node(tag=file_info.name, identifier=file_info.id,
+                                                                  parent=parent_file_id, data=file_info)
+                            result_list.append(file_id)
                 elif path.is_dir():
                     if upload_path == 'root':
                         upload_path = '/'
@@ -234,14 +235,15 @@ class Commander:
                         except KeyboardInterrupt:
                             self.__del__()
                             raise
-                        if isinstance(result, str):
-                            file_id = result
-                        else:
-                            file_info = self._path_list.get_file_info(result)[0]
-                            file_id = file_info.id
-                            self._path_list._tree.create_node(tag=file_info.name, identifier=file_info.id,
-                                                              parent=parent_file_id, data=file_info)
-                        result_list.append(file_id)
+                        if result:
+                            if isinstance(result, str):
+                                file_id = result
+                            else:
+                                file_info = self._path_list.get_file_info(result)[0]
+                                file_id = file_info.id
+                                self._path_list._tree.create_node(tag=file_info.name, identifier=file_info.id,
+                                                                  parent=parent_file_id, data=file_info)
+                            result_list.append(file_id)
                 else:
                     raise FileNotFoundError
                 for file_hash, path in GLOBAL_VAR.file_set:
@@ -464,10 +466,16 @@ class Commander:
         aliyunpan_tui = AliyunpanTUI(self)
         aliyunpan_tui.run()
 
-    def sync(self, path, upload_path, sync_time, time_out, chunk_size, retry):
-        self._print.refresh_line()
+    def sync(self, path, upload_path, sync_time, time_out, chunk_size, retry, first=True):
+        if first and path == 'root':
+            self._print.print_info(
+                'Do you really want to synchronize the root? This operation may delete all your files.', error=True)
+            input('\nEnter to continue.')
+        first = False
         path = AliyunpanPath(path)
         relative_path = AliyunpanPath(path.name)
+        if str(relative_path) == '.':
+            return self.sync(path.absolute(), upload_path, sync_time, time_out, chunk_size, retry, first=first)
         upload_path = AliyunpanPath(upload_path)
         p = upload_path / relative_path
         self._path_list.update_path_list(p, is_fid=False)
@@ -477,7 +485,7 @@ class Commander:
             self._path_list.update_path_list(p, is_fid=False)
             file_id = self._path_list.get_path_fid(p, update=False)
         path_ = self._path_list._tree.to_dict(file_id, with_data=True)[str(relative_path)]
-        change_file_list = self.check_path(path, path_['children'] if 'children' in path_ else [])
+        change_file_list = self.check_path_diff(path, path_['children'] if 'children' in path_ else [])
         for path_ in change_file_list:
             relative_path = path.name / (path - path_)
             if path_.exists():
@@ -492,10 +500,12 @@ class Commander:
         if sync_time:
             if len(change_file_list):
                 self._print.print_line()
+            else:
+                self._print.refresh_line()
             self._print.wait_info('等待{time}秒后再次同步', t=sync_time, refresh_line=True)
-            self.sync(path, upload_path, sync_time, time_out, chunk_size, retry)
+            self.sync(path, upload_path, sync_time, time_out, chunk_size, retry, first=first)
 
-    def check_path(self, local_path, disk_path_list):
+    def check_path_diff(self, local_path, disk_path_list):
         p = Path(local_path)
         change_file_list = []
         for path in p.iterdir():
@@ -505,11 +515,13 @@ class Commander:
                 if p / name not in p.iterdir():
                     change_file_list.append(p / name)
                 if Path(path) == p / name:
-                    if 'children' in file_info and Path(path).is_dir() and \
-                            Path(path).is_dir() != file_info['data'].type:
-                        children = file_info['children']
-                        change_file_list.extend(self.check_path(p / name, children))
-                    if file_info and path.is_file() == file_info['data'].type:
+                    if Path(path).is_dir() and file_info['data'] and path.is_dir() != file_info['data'].type:
+                        if 'children' in file_info:
+                            children = file_info['children']
+                            change_file_list.extend(self.check_path_diff(p / name, children))
+                        elif list(path.iterdir()):
+                            change_file_list.extend(list(path.iterdir()))
+                    if file_info and file_info['data'] and path.is_file() == file_info['data'].type:
                         if path.is_file() and get_sha1(path).lower() != file_info['data'].content_hash.lower():
                             continue
                         flag = True

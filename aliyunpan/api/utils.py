@@ -7,7 +7,7 @@ import sys
 
 import rsa
 
-__all__ = ['ROOT_DIR', 'logger', 'get_sha1', 'str_of_size', 'Iter', 'encrypt', 'parse_biz_ext']
+__all__ = ['ROOT_DIR', 'logger', 'log_file', 'get_sha1', 'str_of_size', 'Iter', 'encrypt', 'parse_biz_ext']
 
 ROOT_DIR = os.path.dirname(os.path.realpath(sys.argv[0]))
 LOG_LEVEL = logging.INFO
@@ -28,6 +28,7 @@ def get_sha1(path, split_size=524288):
     from aliyunpan.common import HashBar
     hash_bar = HashBar(size=file_size)
     hash_bar.hash_info(path, size=file_size)
+    hash_bar.print_line()
     hash_bar.update(refresh_line=False)
     with open(path, 'rb') as f:
         sha1 = hashlib.sha1()
@@ -44,6 +45,7 @@ def get_sha1(path, split_size=524288):
     logger.info(f'The SHA1 of file {path} is {content_hash}.')
     hash_bar.refresh_line()
     hash_bar.hash_info(path, status=True, size=file_size, refresh_line=True)
+    hash_bar.print_line()
     return content_hash
 
 

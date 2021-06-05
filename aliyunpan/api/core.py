@@ -343,6 +343,7 @@ class AliyunPan(object):
                 GLOBAL_VAR.tasks[content_hash] = task_info
         upload_bar = UploadBar(size=file_size)
         upload_bar.upload_info(path)
+        upload_bar.print_line()
         upload_bar.update(refresh_line=False)
         logger.debug(f'upload_id: {upload_id}, file_id: {file_id}, part_info_list: {part_info_list}')
         part_info_list = Iter(part_info_list)
@@ -415,12 +416,13 @@ class AliyunPan(object):
                 self._print.wait_info(refresh_line=True)
             k = part_number / len(part_info_list)
             upload_bar.update(ratio=k, refresh_line=True)
+        file_info = None
         try:
             file_info = self.complete(file_id, upload_id)
         except InvalidContentHash:
             upload_bar.upload_info(path, status=False, refresh_line=True)
-            self._print.print_line()
-            raise
+            if Path(log_file).absolute() != path.absolute():
+                raise
         if file_info:
             upload_bar.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
                                    refresh_line=True)

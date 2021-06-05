@@ -212,7 +212,7 @@ class Printer(OutPut):
                            refresh_line=refresh_line)
 
     def wait_info(self, title=None, t=3, refresh_line=False):
-        while t:
+        while t > 0:
             self.output = Info((title or '{time}秒后重试').format(time=t), color=self._wait_color,
                                refresh_line=refresh_line)
             t -= 1
@@ -259,10 +259,16 @@ class Printer(OutPut):
         self.output = info
 
     def refresh_line(self):
+        if self._output:
+            self._print.print_line = False
         self.output = Info(refresh_line=True)
 
     def print_line(self):
-        self._print.print_line = True
+        if self._output:
+            self._print.print_line = True
+
+    def print_info(self, info, error=False, refresh_line=False, *args, **kwargs):
+        self.output = Info(info, error, refresh_line, *args, **kwargs)
 
 
 class Bar(Printer):
