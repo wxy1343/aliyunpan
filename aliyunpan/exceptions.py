@@ -93,6 +93,7 @@ class AliyunpanCode(object):
     existed = 'AlreadyExist.File'
     token_invalid = 'AccessTokenInvalid'
     invalid_content_hash = 'InvalidParameter.ContentHash'
+    not_found_file = 'NotFound.File'
     request_expired = 403
     part_already_exist = 409
     part_not_sequential = 400

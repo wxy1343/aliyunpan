@@ -435,7 +435,7 @@ class Commander:
                 share_txt = file.name.center(50, '-') + '\n'
                 if download_link:
                     share_txt += '下载链接'.center(50, '*') + '\n'
-                    url = self._disk.get_download_url(file.id, expire_sec)
+                    url = self._disk.get_download_url(file.id, expire_sec, file.category)
                     share_txt += url + '\n\n'
                 if share_link:
                     share_txt += '分享链接'.center(50, '*') + '\n'

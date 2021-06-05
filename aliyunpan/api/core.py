@@ -95,7 +95,6 @@ class AliyunPan(object):
         json = {"drive_id": self.drive_id, "parent_file_id": parent_file_id, 'fields': '*', 'marker': next_marker}
         logger.info(f'Get the list of parent_file_id {parent_file_id}.')
         r = self._req.post(url, json=json)
-        logger.debug(r.status_code)
         logger.debug(r.json())
         if 'items' not in r.json():
             return []
@@ -137,7 +136,6 @@ class AliyunPan(object):
                 "resource": "file"}
         logger.info(f'Move files {file_id} to {parent_file_id}')
         r = self._req.post(url, json=json)
-        logger.debug(r.status_code)
         if r.status_code == 200:
             if 'message' in r.json()['responses'][0]['body']:
                 print(r.json()['responses'][0]['body']['message'])
@@ -496,7 +494,6 @@ class AliyunPan(object):
         json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
         logger.info(f'Get ACCESS_TOKEN.')
         r = self._req.post(url, json=json, access_token=False)
-        logger.debug(r.status_code)
         try:
             access_token = r.json()['access_token']
         except KeyError:
@@ -544,20 +541,28 @@ class AliyunPan(object):
             else:
                 drive_id = self.get_drive_id()
 
-    def get_download_url(self, file_id, expire_sec=14400) -> str:
+    def get_download_url(self, file_id, expire_sec=14400, category=None) -> str:
         """
         获取分享链接
         :param file_id:
         :param expire_sec: 文件过期时间（秒）
+        :param category:
         :return:
         """
         url = 'https://api.aliyundrive.com/v2/file/get_download_url'
         json = {'drive_id': self.drive_id, 'file_id': file_id, 'expire_sec': expire_sec}
         logger.info(f'Get file {file_id} download link, expiration time {expire_sec} seconds.')
         r = self._req.post(url, json=json)
-        logger.debug(r.status_code)
-        url = r.json()['url']
+        url = r.json()['url'] if 'url' in r.json() else ''
         logger.debug(f'file_id:{file_id},expire_sec:{expire_sec},url:{url}')
+        if not url:
+            if 'internal_url' in r.json() and r.json()['internal_url']:
+                url = r.json()['internal_url']
+            else:
+                url_dict = self.get_play_info(file_id, expire_sec, category) if category else \
+                    self.get_play_info(file_id, expire_sec, 'video') or self.get_play_info(file_id, expire_sec, 'audio')
+                if url_dict:
+                    url = list(url_dict.values())[-1]
         return url
 
     def save_share_link(self, name: str, content_hash: str, content_hash_name: str, size: str,
@@ -595,10 +600,28 @@ class AliyunPan(object):
             'order_by': 'updated_at DESC'
         }
         r = self._req.post(url, json=json)
-        logger.debug(r.status_code)
         if 'items' not in r.json():
             return []
         file_list = r.json()['items']
         if 'next_marker' in r.json() and r.json()['next_marker'] and next_marker != r.json()['next_marker']:
             file_list.extend(self.search(query, r.json()['next_marker']))
         return file_list
+
+    def get_play_info(self, file_id, expire_sec=14400, category=None):
+        if category == 'video':
+            url = 'https://api.aliyundrive.com/v2/databox/get_video_play_info'
+        elif category == 'audio':
+            url = 'https://api.aliyundrive.com/v2/databox/get_audio_play_info'
+        else:
+            return {}
+        json = {'drive_id': self.drive_id, 'file_id': file_id, 'expire_sec': expire_sec}
+        r = self._req.post(url, json=json)
+        if 'code' in r.json() and r.json()['code'] == AliyunpanCode.not_found_file:
+            return {}
+        play_dict = {}
+        if 'template_list' in r.json():
+            for i in r.json()['template_list']:
+                if i['status']:
+                    play_dict[i['template_id']] = i['url']
+            return play_dict
+        return {}
