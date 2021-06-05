@@ -153,8 +153,6 @@ class OutPutSingleton(OutPut):
                     if info.refresh_line:
                         if len(last_info) > len(info):
                             self._stdout.write('\r' + len(last_info) * ' ')
-                    else:
-                        self.print_line = True
                 if info.error:
                     self._stderr.write(str(info))
                 else:
@@ -310,7 +308,7 @@ class Bar(Printer):
             if self._ratio != ratio and average_speed is not None:
                 self._average_speed = average_speed
                 self._ratio = ratio
-        if self._output and t and time.time() - self._update_time >= self.refresh_interval:
+        if t and time.time() - self._update_time >= self.refresh_interval:
             self._update_time = time.time()
             upload_info = self._format()
             self.output = Info(upload_info, refresh_line=refresh_line, color=Fore.LIGHTMAGENTA_EX)
@@ -323,7 +321,7 @@ class GetFileListBar(Bar):
         self._depth = 0
         self._upload_info = '{title}{:<3s} [{}{}] {:.2%} [{depth}/{max_depth}] {:.2f}{unit}/s'
         self._title = 'get_file_list'
-        self._time_out = 3
+        self._time_out = 5
         self.refresh_interval = 0
         self._output = False
 

@@ -152,7 +152,8 @@ class Commander:
             return False
         if file_id:
             self._print.mkdir_info(path, status=True)
-            self._path_list._tree.create_node(tag=path.name, identifier=file_id, parent=parent_file_id)
+            self._path_list._tree.create_node(tag=path.name, identifier=file_id, parent=parent_file_id,
+                                              data=FileInfo(name=path.name, type=False))
             file_id_list.append((file_id, path))
         return file_id_list
 
@@ -361,13 +362,16 @@ class Commander:
                 self._print.download_info(p)
                 self._print.print_line()
                 self.download_file(p, file_node.download_url, chunk_size)
+                self._print.print_line()
             else:
                 self.download(self._path_list.get_fid_list(file_node.id), save_path / p.name)
 
     def download_file(self, path, url, chunk_size=1048576):
         try:
             path.parent.mkdir(parents=True)
+            self._print.print_line()
             self._print.mkdir_info(path.parent, status=True)
+            self._print.print_line()
         except FileExistsError:
             pass
         if path.exists():
@@ -387,6 +391,7 @@ class Commander:
                 temp_size = 0
             else:
                 mode = 'ab'
+            self._print.print_line()
             download_bar = DownloadBar(size=file_size)
             download_bar.update(refresh_line=False)
             with path.open(mode) as f:
@@ -397,6 +402,7 @@ class Commander:
                         temp_size += len(chunk)
                         f.write(chunk)
         except requests.exceptions.RequestException:
+            self._print.refresh_line()
             self._print.download_info(path, status=False)
             self._print.print_line()
             return False
@@ -486,23 +492,18 @@ class Commander:
             file_id = self._path_list.get_path_fid(p, update=False)
         path_ = self._path_list._tree.to_dict(file_id, with_data=True)[str(relative_path)]
         change_file_list = self.check_path_diff(path, path_['children'] if 'children' in path_ else [])
+        self._print.refresh_line()
         for path_ in change_file_list:
             relative_path = path.name / (path - path_)
             if path_.exists():
-                if path_.is_file():
-                    self.upload(path_, upload_path / relative_path.parent, force=True, timeout=time_out,
-                                chunk_size=chunk_size, retry=retry)
-                else:
-                    self.upload(path_, upload_path / relative_path.parent, timeout=time_out, chunk_size=chunk_size,
-                                retry=retry)
+                self.upload(path_, upload_path / relative_path.parent, force=True, timeout=time_out,
+                            chunk_size=chunk_size, retry=retry)
             else:
                 self.rm(upload_path / relative_path)
+            self._print.print_line()
         if sync_time:
-            if len(change_file_list):
-                self._print.print_line()
-            else:
-                self._print.refresh_line()
             self._print.wait_info('等待{time}秒后再次同步', t=sync_time, refresh_line=True)
+            self._print.refresh_line()
             self.sync(path, upload_path, sync_time, time_out, chunk_size, retry, first=first)
 
     def check_path_diff(self, local_path, disk_path_list):
