@@ -550,19 +550,19 @@ class AliyunPan(object):
         :return:
         """
         url = 'https://api.aliyundrive.com/v2/file/get_download_url'
+        illegal_url = 'https://pds-system-file.oss-cn-beijing.aliyuncs.com/illegal.mp4'
         json = {'drive_id': self.drive_id, 'file_id': file_id, 'expire_sec': expire_sec}
         logger.info(f'Get file {file_id} download link, expiration time {expire_sec} seconds.')
         r = self._req.post(url, json=json)
         url = r.json()['url'] if 'url' in r.json() else ''
-        logger.debug(f'file_id:{file_id},expire_sec:{expire_sec},url:{url}')
-        if not url:
-            if 'internal_url' in r.json() and r.json()['internal_url']:
+        if not url or url == illegal_url:
+            url_dict = self.get_play_info(file_id, expire_sec, category) if category else \
+                self.get_play_info(file_id, expire_sec, 'video') or self.get_play_info(file_id, expire_sec, 'audio')
+            if url_dict:
+                url = list(url_dict.values())[-1]
+            elif 'internal_url' in r.json() and r.json()['internal_url']:
                 url = r.json()['internal_url']
-            else:
-                url_dict = self.get_play_info(file_id, expire_sec, category) if category else \
-                    self.get_play_info(file_id, expire_sec, 'video') or self.get_play_info(file_id, expire_sec, 'audio')
-                if url_dict:
-                    url = list(url_dict.values())[-1]
+        logger.debug(f'file_id:{file_id},expire_sec:{expire_sec},url:{url}')
         return url
 
     def save_share_link(self, name: str, content_hash: str, content_hash_name: str, size: str,

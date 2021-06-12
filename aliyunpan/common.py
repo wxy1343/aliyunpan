@@ -179,6 +179,7 @@ class Printer(OutPut):
         self._time_info = 'time:{:.2f}s'
         self.avg_info = 'avg:{:.2f}{}/s'
         self._error_info = 'Error:{}'
+        self._aria2_title = 'aria2'
         self._mkdir_color = Fore.LIGHTCYAN_EX
         self._move_color = Fore.LIGHTMAGENTA_EX
         self._remove_color = Fore.LIGHTRED_EX
@@ -225,10 +226,12 @@ class Printer(OutPut):
                              refresh_line=refresh_line, **kwargs)
         self.output = info
 
-    def download_info(self, path, status=None, refresh_line=False, t=None, average_speed=None, *args):
+    def download_info(self, path, status=None, refresh_line=False, t=None, average_speed=None, aria2=False, *args):
         t = self._time_info.format(t) if t else None
+        aria2 = self._aria2_title if aria2 else aria2
         average_speed = self.avg_info.format(*str_of_size(average_speed, tuple_=True)) if average_speed else None
-        info = self.get_info(status, path, self._download_title, t, average_speed, *args, refresh_line=refresh_line)
+        info = self.get_info(status, path, self._download_title, aria2, t, average_speed, *args,
+                             refresh_line=refresh_line)
         self.output = info
 
     def mkdir_info(self, path, status=None, *args, **kwargs):

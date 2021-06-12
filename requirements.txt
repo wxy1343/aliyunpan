@@ -9,3 +9,4 @@ colorama~=0.4.3
 npyscreen==4.10.5
 windows-curses;platform_system=="Windows"
 pyperclip~=1.8.1
+aria2p

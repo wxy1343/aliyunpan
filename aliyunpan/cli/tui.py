@@ -27,6 +27,23 @@ class Text:
                     text += ' '
         return text
 
+    def __repr__(self):
+        text = self._text
+        if platform.system() == 'Windows':
+            text = ''
+            del_list = []
+            for i, _char in enumerate(self._text):
+                if len(_char.encode()) > 1:
+                    if len(self._text) > i + 1 and self._text[i + 1] == ' ':
+                        del_list.append(i + 1)
+            for i, _char in enumerate(self._text):
+                if i not in del_list:
+                    text += _char
+        return text
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
 
 class AliyunpanFileForm(npyscreen.FormBaseNewWithMenus):
     def create(self):
@@ -36,12 +53,15 @@ class AliyunpanFileForm(npyscreen.FormBaseNewWithMenus):
         self.download_menu = self.file_menu.addNewSubmenu(name='Download Menu', shortcut='^D')
         self.download_menu.addItemsFromList([
             ('Copy the download link', file.copy_download_link, '^C'),
-            ('Download file', file.download, '^D')
+            ('Download file', file.download, '^D'),
+            ('Aria2', file.aria2, '^A')
         ])
         self.file_menu.addItemsFromList([
             ('Show file details', file.show_file_info, '^X'),
             ('Cast screen to TV', file.dlna, '^A'),
-            ('Search', file.search, '^F')
+            ('Search', file.search, '^F'),
+            ('Remove', file.remove, '^R'),
+            ('Mkdir', file.mkdir, 'm')
         ])
 
 
@@ -218,6 +238,7 @@ class FileGrid(npyscreen.SimpleGrid):
     file_name = property(lambda self: self.values[self.edit_cell[0]][self.edit_cell[1]])
     _file_info = property(lambda self: [file_info for file_info in self._file_list if file_info.name == self.file_name])
     file_info = property(lambda self: self._file_info[0] if self._file_info else None)
+    parent_file_info = property(lambda self: self._parent_file_info)
 
     def set_up_handlers(self):
         super(FileGrid, self).set_up_handlers()
@@ -236,17 +257,26 @@ class FileGrid(npyscreen.SimpleGrid):
     def _exit(self, _):
         raise KeyboardInterrupt
 
-    def download(self):
+    def download(self, aria2=False):
         if self.file_info:
+            path = Path(Text(self.parent.name).__repr__()) / Path(self.file_info.name)
             if self.file_info.type:
-                Thread(
-                    target=functools.partial(self.parent.parentApp._cli.download_file, path=Path(self.file_info.name),
-                                             url=self.file_info.download_url)).start()
+                if aria2:
+                    Thread(target=functools.partial(self.parent.parentApp._cli.download, str(path), aria2=True)).start()
+                else:
+                    Thread(target=functools.partial(self.parent.parentApp._cli.download_file,
+                                                    path=Path(self.file_info.name),
+                                                    url=self.file_info.download_url)).start()
             else:
-                path = Path(self.file_info.name)
-                if self.parent.name != 'root':
-                    path = self.parent.name / Path(self.file_info.name)
-                Thread(target=functools.partial(self.parent.parentApp._cli.download, path=str(path))).start()
+                if self.parent.name == 'root':
+                    path = Path(self.file_info.name)
+                if aria2:
+                    Thread(target=functools.partial(self.parent.parentApp._cli.download, str(path), aria2=True)).start()
+                else:
+                    Thread(target=functools.partial(self.parent.parentApp._cli.download, path=str(path))).start()
+
+    def aria2(self):
+        self.download(aria2=True)
 
     def copy_download_link(self):
         if self.file_info and self.file_info.name == self.file_name and self.file_info.type:
@@ -256,14 +286,26 @@ class FileGrid(npyscreen.SimpleGrid):
                 npyscreen.notify_confirm(f'Already copied to clipboard!\n{Text(self.file_info.name)}\n{url}')
 
     def dlna(self):
-        if self.file_info:
-            if self.file_info.name == self.file_name and self.file_info.type:
-                self.parent.parentApp.file_info = self.file_info
-                self.parent.parentApp.switchForm('DLNA')
+        if self.file_info and self.file_info.name == self.file_name and self.file_info.type:
+            self.parent.parentApp.file_info = self.file_info
+            self.parent.parentApp.switchForm('DLNA')
 
     def search(self):
         self.parent.parentApp.file_grid = self
         self.parent.parentApp.switchForm('Search')
+
+    def remove(self):
+        if self.file_info and Text(self.file_info.name) == Text(self.file_name):
+            self.parent.parentApp._cli.rm(path=None, file_id=self.file_info.id)
+            file_list = []
+            for i in self.values:
+                file_list.extend(i)
+            file_list.remove(self.file_info.name)
+            self.set_grid_values_from_flat_list(file_list)
+
+    def mkdir(self):
+        self.parent.parentApp.file_grid = self
+        self.parent.parentApp.switchForm('Mkdir')
 
     def show_file_info(self, file_info=None):
         if not file_info:
@@ -303,6 +345,9 @@ class FileGrid(npyscreen.SimpleGrid):
             self._parent_file_info = None
             if file_id != 'root':
                 self._parent_file_info = self.parent.parentApp._cli._path_list._tree.get_node(file_id).data
+        else:
+            self._file_list = self.parent.parentApp._cli._path_list.get_fid_list(self._parent_file_info.id,
+                                                                                 update=False)
         for file_info in self._file_list:
             file_list.append(file_info.name)
         if self._parent_file_info and self._parent_file_info.pid:
@@ -372,6 +417,31 @@ class Search(npyscreen.ActionPopup):
         pass
 
 
+class Mkdir(npyscreen.ActionPopup):
+    def create(self):
+        self.name = self.add(npyscreen.TitleText, name='name')
+
+    def afterEditing(self):
+        self.parentApp.setNextFormPrevious()
+
+    def on_ok(self):
+        if not self.parentApp.file_grid.searched:
+            if self.parentApp.file_grid.parent_file_info:
+                parent_file_id = self.parentApp.file_grid.parent_file_info.id
+            else:
+                parent_file_id = 'root'
+            file_id = self.parentApp._cli.mkdir(path=None, name=self.name.value, parent_file_id=parent_file_id)[0][0]
+            file_list = []
+            for i in self.parentApp.file_grid.values:
+                file_list.extend(i)
+            file_list.append(str(Text(self.name.value)))
+            self.parentApp.file_grid._file_list.append(self.parentApp._cli._path_list._tree.get_node(file_id).data)
+            self.parentApp.file_grid.set_grid_values_from_flat_list(file_list)
+
+    def on_cancel(self):
+        pass
+
+
 class AliyunpanTUI(npyscreen.NPSAppManaged):
     def __init__(self, cli):
         self._cli = cli
@@ -382,3 +452,4 @@ class AliyunpanTUI(npyscreen.NPSAppManaged):
         self.addForm('MAIN', AliyunpanFileForm)
         self.addForm('DLNA', Dlna)
         self.addForm('Search', Search)
+        self.addForm('Mkdir', Mkdir)

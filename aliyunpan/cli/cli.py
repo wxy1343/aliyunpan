@@ -1,6 +1,8 @@
 import os
 
+import aria2p
 import requests
+from aria2p import Options
 
 from aliyunpan.api.core import AliyunPan
 from aliyunpan.api.models import *
@@ -24,6 +26,7 @@ class Commander:
         self._task_config = Config(ROOT_DIR / Path('tasks.yaml'))
         self._share_link = 'aliyunpan://'
         self._print = Printer()
+        self._aria2 = None
         self._config_set = {'~/.config/aliyunpan.yaml', '.config/aliyunpan.yaml', '~/aliyunpan.yaml', 'aliyunpan.yaml',
                             os.environ.get('ALIYUNPAN_CONF', '')}
         GLOBAL_VAR.tasks = self._task_config.read()
@@ -38,6 +41,11 @@ class Commander:
             self._config_set.add(config_file)
         config_file = list(
             filter(lambda x: Path(x).is_file(), map(lambda x: Path(x).expanduser(), self._config_set)))
+        if config_file and config_file[0]:
+            self._config.config_file = config_file[0]
+            aria2 = self._config.get('aria2') or {'host': 'http://localhost', 'port': 6800}
+            if aria2:
+                self._aria2 = self.aria2_init(**aria2)
         if refresh_token:
             if not len(refresh_token) == 32:
                 raise InvalidRefreshToken
@@ -47,7 +55,6 @@ class Commander:
                 raise InvalidPassword
             self._disk.login(username, password)
         elif config_file:
-            self._config.config_file = config_file[0]
             refresh_token = self._config.get('refresh_token')
             username = self._config.get('username')
             password = self._config.get('password')
@@ -64,6 +71,17 @@ class Commander:
         else:
             raise ConfigurationFileNotFoundError
 
+    def aria2_init(self, **kwargs):
+        kwargs.setdefault('host', 'http://localhost')
+        kwargs.setdefault('port', 6800)
+        kwargs.setdefault('secret', '')
+        self._aria2 = aria2p.API(
+            aria2p.Client(
+                **kwargs
+            )
+        )
+        return self._aria2
+
     def ls(self, path, l, query=None):
         if query:
             file_info_list = self._path_list.get_file_info(self._disk.search(query))
@@ -78,17 +96,25 @@ class Commander:
             else:
                 print(i.name, end='\t')
 
-    def tree(self, path='root'):
-        return self._path_list.tree(path)
+    def get_path_list(self, path):
+        return self._path_list.get_path_list(path, update=False)
 
-    def rm(self, path):
-        file_id = self._path_list.get_path_fid(path, update=False)
+    def get_fid_list(self, file_id):
+        return self._path_list.get_fid_list(file_id, update=False)
+
+    def tree(self, path='root', stdout=sys.stdout):
+        return self._path_list.tree(path, stdout)
+
+    def rm(self, path, file_id=None):
+        if not file_id:
+            file_id = self._path_list.get_path_fid(path, update=False)
         if file_id:
             file_id_ = self._disk.delete_file(file_id)
             if file_id_ == file_id:
                 file_id = file_id_
-                self._print.remove_info(path, status=False)
+                self._print.remove_info(path or file_id, status=False)
                 self._path_list._tree.remove_node(file_id)
+                self._print.print_line()
             else:
                 file_id = False
         return file_id
@@ -128,23 +154,26 @@ class Commander:
                     self._path_list.update_path_list(Path(target_path) / path, is_fid=False)
                 else:
                     self._print.move_info(path, target_path, status=False)
+                self._print.print_line()
                 return _
         elif path.parent == target_path.parent:
             self.rename(path, target_path.name)
 
-    def mkdir(self, path):
+    def mkdir(self, path, name=None, parent_file_id=None):
         file_id_list = []
-        path = AliyunpanPath(path)
-        if str(path) == 'root':
-            return file_id_list
-        file_id = self._path_list.get_path_fid(path, update=False)
-        if file_id and file_id != 'root':
-            return file_id_list
-        parent_file_id = self._path_list.get_path_fid(path.parent, update=False)
-        if not parent_file_id:
-            file_id_list.extend(self.mkdir(path.parent))
-            parent_file_id, _ = file_id_list[-1]
-        r = self._disk.create_file(path.name, parent_file_id)
+        if not parent_file_id or not name:
+            path = AliyunpanPath(path)
+            name = path.name
+            if str(path) == 'root':
+                return file_id_list
+            file_id = self._path_list.get_path_fid(path, update=False)
+            if file_id and file_id != 'root':
+                return file_id_list
+            parent_file_id = self._path_list.get_path_fid(path.parent, update=False)
+            if not parent_file_id:
+                file_id_list.extend(self.mkdir(path.parent))
+                parent_file_id, _ = file_id_list[-1]
+        r = self._disk.create_file(name, parent_file_id)
         try:
             file_id = r.json()['file_id']
         except KeyError:
@@ -152,8 +181,9 @@ class Commander:
             return False
         if file_id:
             self._print.mkdir_info(path, status=True)
-            self._path_list._tree.create_node(tag=path.name, identifier=file_id, parent=parent_file_id,
-                                              data=FileInfo(name=path.name, type=False))
+            self._print.print_line()
+            self._path_list._tree.create_node(tag=name, identifier=file_id, parent=parent_file_id,
+                                              data=FileInfo(name=name, type=False, id=file_id, pid=parent_file_id))
             file_id_list.append((file_id, path))
         return file_id_list
 
@@ -294,7 +324,7 @@ class Commander:
             if file_id_list:
                 for file_id, path in file_id_list:
                     folder_list.append((file_id, upload_path / path))
-        folder_list = tuple(set(folder_list))
+        folder_list = list(set(folder_list))
         for share_info in share_info_list:
             path = share_info.path
             if str(upload_path) in ('', '.') and str(path) == 'root':
@@ -311,7 +341,7 @@ class Commander:
                 self._print.upload_info(p, status=False)
         return folder_list, file_list
 
-    def download(self, path, save_path=None, single_file=False, share=False, chunk_size=1048576):
+    def download(self, path, save_path=None, single_file=False, share=False, chunk_size=1048576, aria2=False, **kwargs):
         if not save_path:
             save_path = Path().cwd()
         save_path = Path(save_path)
@@ -326,12 +356,17 @@ class Commander:
                 for file_id, path in folder_list:
                     p = save_path / path
                     try:
-                        p.mkdir(parents=True)
-                        self._print.mkdir_info(p, status=True)
+                        if not aria2:
+                            p.mkdir(parents=True)
+                            self._print.mkdir_info(p, status=True)
                     except FileExistsError:
                         pass
                 for file_id, path in file_list:
-                    self.download_file(save_path / path, self._disk.get_download_url(file_id), chunk_size)
+                    if aria2:
+                        kwargs.update({'dir': str((save_path / path).parent.absolute())})
+                        self._aria2.add_uris([self._disk.get_download_url(file_id)], Options(self._aria2, kwargs))
+                    else:
+                        self.download_file(save_path / path, self._disk.get_download_url(file_id), chunk_size)
                 for file_id, path in file_list:
                     self._path_list.update_path_list(path.parent, depth=0, is_fid=False)
                     try:
@@ -359,12 +394,18 @@ class Commander:
             if file_node.type:
                 if single_file:
                     p = save_path / p.name
-                self._print.download_info(p)
-                self._print.print_line()
-                self.download_file(p, file_node.download_url, chunk_size)
+                if aria2:
+                    kwargs.update({'dir': str(p.parent.absolute())})
+                    self._aria2.add_uris([self._disk.get_download_url(file_node.id)], Options(self._aria2, kwargs))
+                    self._print.download_info(p, status=True, aria2=True)
+                else:
+                    self._print.download_info(p)
+                    self._print.print_line()
+                    self.download_file(p, file_node.download_url, chunk_size)
                 self._print.print_line()
             else:
-                self.download(self._path_list.get_fid_list(file_node.id), save_path / p.name)
+                self.download(self._path_list.get_fid_list(file_node.id), save_path=save_path / p.name,
+                              chunk_size=chunk_size, aria2=aria2, **kwargs)
 
     def download_file(self, path, url, chunk_size=1048576):
         try:

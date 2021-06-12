@@ -38,6 +38,17 @@ echo "username: 'xxxxx'"  >  ~/.config/aliyunpan.yaml
 echo "password: 'xxxxx'"  >>  ~/.config/aliyunpan.yaml
 ```
 
+### 配置aria2(可选)
+
+```shell
+cat >> ~/.config/aliyunpan.yaml <<EOF
+aria2:
+  'host': 'http://localhost'
+  'port': 6800
+  'secret': ''
+EOF
+```
+
 ## 功能介绍
 
 |指令                 |描述                           |
@@ -133,6 +144,11 @@ python main.py COMMAND -h
                 <td>download</td>
                 <td>-cs, --chunk-size</td>
                 <td>分块大小(字节)</td>
+            </tr> 
+            <tr>
+                <td>download</td>
+                <td>-a, --aria2</td>
+                <td>发送到aria2</td>
             </tr> 
             <tr>
                 <td>ls,search</td>

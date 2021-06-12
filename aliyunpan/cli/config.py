@@ -1,5 +1,7 @@
 from pathlib import Path
+
 from ruamel.yaml import YAML
+
 from aliyunpan.common import DATA
 
 __all__ = ['Config']
@@ -42,7 +44,7 @@ class Config:
         if key in conf.keys():
             value = conf.get(key)
             return value
-        return False
+        return None
 
     def update(self, key, value):
         conf = self.read() or {}

@@ -6,7 +6,7 @@ from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
-__version__ = '2.3.2'
+__version__ = '2.4.0'
 
 
 @click.group(cls=ClickAliasedGroup)
@@ -98,20 +98,25 @@ def mkdir(path):
     commander.mkdir(path)
 
 
-@cli.command(aliases=['d'], help='Download files.')
+@cli.command(aliases=['d'], help='Download files.',
+             context_settings=dict(ignore_unknown_options=True, allow_extra_args=True))
 @click.help_option('-h', '--help')
 @click.argument('path', type=click.Path(), default='')
 @click.option('-p', '--file', multiple=True, help='Select multiple files.', type=click.Path())
 @click.argument('save_path', type=click.Path(), default='')
 @click.option('-s', 'share', is_flag=True, help='Specify the shared sequence file')
 @click.option('-cs', '--chunk-size', type=click.INT, help='Chunk size(byte).', default=1048576, show_default=True)
-def download(path, file, save_path, share, chunk_size):
+@click.option('-a', '--aria2', is_flag=True, help='Send to aria2.')
+@click.pass_context
+def download(ctx, path, file, save_path, share, chunk_size, aria2):
     if not path and not file:
         raise click.MissingParameter(param=click.get_current_context().command.params[2])
     else:
         file_list = {*file, path}
-
-    commander.download(file_list, save_path, share=share, chunk_size=chunk_size)
+    kwargs = {}
+    for i in ctx.args:
+        kwargs[i.split('=')[0]] = i.split('=')[1]
+    commander.download(file_list, save_path=save_path, share=share, chunk_size=chunk_size, aria2=aria2, **kwargs)
 
 
 @cli.command(aliases=['t', 'show'], help='View file tree.')

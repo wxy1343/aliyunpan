@@ -3,6 +3,7 @@ import time
 from pathlib import Path, PurePosixPath
 
 from treelib import Tree
+from treelib.exceptions import NodeIDAbsentError
 
 from aliyunpan.api.type import FileInfo, ShareInfo
 from aliyunpan.common import GetFileListBar
@@ -93,7 +94,10 @@ class PathList:
     def get_fid_list(self, file_id, update=True):
         if not file_id:
             raise FileNotFoundError(Path)
-        self.auto_update_path_list(update, file_id)
+        try:
+            self.auto_update_path_list(update, file_id)
+        except NodeIDAbsentError:
+            return list(map(self.get_file_info, self._disk.get_file_list(file_id)))
         if file_id != 'root' and self._tree.get_node(file_id).data.type:
             return [self._tree.get_node(file_id).data]
         return [i.data for i in self._tree.children(file_id)]
@@ -175,7 +179,7 @@ class AliyunpanPath(type(Path())):
             return True
 
     def __hash__(self):
-        return self.__str__()
+        return hash(self.__str__())
 
     def __sub__(self, other: Path):
         parts = []
