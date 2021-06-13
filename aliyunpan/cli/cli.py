@@ -26,6 +26,7 @@ class Commander:
         self._task_config = Config(ROOT_DIR / Path('tasks.yaml'))
         self._share_link = 'aliyunpan://'
         self._print = Printer()
+        self._host_url = 'https://www.aliyundrive.com/'
         self._aria2 = None
         self._config_set = {'~/.config/aliyunpan.yaml', '.config/aliyunpan.yaml', '~/aliyunpan.yaml', 'aliyunpan.yaml',
                             os.environ.get('ALIYUNPAN_CONF', '')}
@@ -349,6 +350,7 @@ class Commander:
             path_list = (path,)
         else:
             path_list = path
+        kwargs.setdefault('referer', self._host_url)
         for path in path_list:
             if str(path).startswith(self._share_link) or share:
                 folder_list, file_list = self.upload(path, share=share)
