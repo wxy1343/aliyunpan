@@ -8,7 +8,7 @@ from threading import Thread
 import npyscreen
 import pyperclip
 
-from aliyunpan.api.utils import logger
+from aliyunpan.api.utils import logger, stop_thread, get_open_port
 
 __all__ = ['AliyunpanTUI']
 
@@ -65,15 +65,23 @@ class AliyunpanFileForm(npyscreen.FormBaseNewWithMenus):
         ])
 
 
-class DeviceSelect(npyscreen.TitleSelectOne):
+class Select(npyscreen.TitleSelectOne):
     def set_up_handlers(self):
-        super(DeviceSelect, self).set_up_handlers()
+        super(Select, self).set_up_handlers()
         self.handlers.update({
             '^C': self._exit
         })
 
     def _exit(self, _):
         raise KeyboardInterrupt
+
+
+class DeviceSelect(Select):
+    pass
+
+
+class QualitySelect(Select):
+    pass
 
 
 class Time(npyscreen.TitleText):
@@ -93,6 +101,7 @@ class Dlna(npyscreen.FormWithMenus):
         self.device_menu.addItemsFromList([
             ('Play', self.play, '^A'),
             ('Proxy Play', self.proxy_play, 'y'),
+            ('Local redirection Play', self.redirect_play, 'r'),
             ('Pause', self.pause, 'p'),
             ('Continue', self.continue_, 'c'),
             ('Mute', self.mute, '^Q'),
@@ -102,8 +111,12 @@ class Dlna(npyscreen.FormWithMenus):
             ('Refresh Device', self.refresh_device, '^R')
         ])
         self.devices = []
+        self.quality_dict = {}
+        self.quality = 'default'
         self.device_select = self.add(DeviceSelect, scroll_exit=False, name='Devices', max_height=5,
                                       value_changed_callback=self.device_changed_callback)
+        self.quality_select = self.add(QualitySelect, scroll_exit=True, name='Quality', max_height=5,
+                                       value_changed_callback=self.quality_changed_callback)
         self.add(npyscreen.TitleSlider, color='STANDOUT', name='Volume', out_of=10,
                  value_changed_callback=self.volume_changed_callback)
         self.position = '00:00:00'
@@ -114,6 +127,10 @@ class Dlna(npyscreen.FormWithMenus):
         self._proxy_port = 8000
         self._change_lock_time = 0
         self.add(npyscreen.ButtonPress, relx=0, name='Set time', when_pressed_function=self.set_time)
+        self._proxy_thread = None
+        self._redirect_thread = None
+        self.proxy = None
+        self.redirect = None
 
     def back(self):
         self.parentApp.switchFormPrevious()
@@ -128,40 +145,81 @@ class Dlna(npyscreen.FormWithMenus):
             logger.error('Cannot find submodule dlnap.')
         else:
             self.dlnap = dlnap
-            self.refresh_device()
+            self._refresh()
 
     def afterEditing(self):
         self.parentApp.setNextFormPrevious()
 
-    def device_changed_callback(self, widget, proxy=False):
+    def device_changed_callback(self, widget):
         if time.time() - self._change_lock_time > 1:
             self._change_lock_time = 0
         if widget.value and len(self.devices) and not self._change_lock_time:
             self._change_lock_time = time.time()
             device = self.devices[widget.value[0]]
-            url = self.parentApp._cli._disk.get_download_url(self.file_info.id)
+            if self.quality and self.quality_dict:
+                url = self.quality_dict[self.quality]
+            else:
+                url = self.parentApp._cli._disk.get_download_url(self.file_info.id)
             logger.info(f'Device {device} is playing {self.file_info.name}')
             if url:
-                if proxy:
+                if self.proxy:
                     ip = self.dlnap._get_serve_ip(device.ip)
-                    Thread(target=self.dlnap.runProxy, daemon=True,
-                           kwargs={'ip': ip, 'port': 8000}).start()
+                    if self._proxy_thread:
+                        stop_thread(self._proxy_thread)
+                    self._proxy_thread = Thread(target=self.dlnap.runProxy, daemon=True,
+                                                kwargs={'ip': ip, 'port': get_open_port()})
+                    self._proxy_thread.start()
                     url = 'http://{}:{}/{}'.format(ip, self._proxy_port, url)
+                elif self.redirect:
+                    ip = self.dlnap._get_serve_ip(device.ip)
+                    if self._redirect_thread:
+                        stop_thread(self._redirect_thread)
+                    port = get_open_port()
+                    self._redirect_thread = Thread(target=Dlna._redirect, args=(url, port), daemon=True).start()
+                    url = 'http://{}:{}/'.format(ip, port)
                 logger.debug(url)
                 device.set_current_media(url)
+                device.play()
 
-    def play(self, proxy=False):
+    def quality_changed_callback(self, widget):
+        if widget.value:
+            try:
+                self.quality = list(self.quality_dict.keys())[widget.value[0]]
+            except IndexError:
+                self.quality = 'default'
+            self.play()
+
+    def play(self, proxy=False, redirect=False):
+        if proxy:
+            self.proxy = True
+            self.redirect = False
+        elif redirect:
+            self.redirect = True
+            self.proxy = False
         if len(self.devices):
             if self.device_select.value:
-                self.device_changed_callback(self.device_select, proxy=proxy)
+                self.device_changed_callback(self.device_select)
             else:
                 self.device_select.value = [self.device_select.entry_widget.cursor_line]
-                self.device_changed_callback(self.device_select, proxy=proxy)
+                self.device_changed_callback(self.device_select)
 
     def proxy_play(self):
-        global running
-        running = False
         self.play(proxy=True)
+
+    @staticmethod
+    def _redirect(url, port):
+        from flask import Flask, redirect
+
+        app = Flask(__name__)
+
+        @app.route('/')
+        def index():
+            return redirect(url, code=301)
+
+        app.run(host='0.0.0.0', port=port)
+
+    def redirect_play(self):
+        self.play(redirect=True)
 
     def pause(self):
         if len(self.devices) and self.device_select.entry_widget.value:
@@ -177,8 +235,6 @@ class Dlna(npyscreen.FormWithMenus):
         if len(self.devices) and self.device_select.entry_widget.value:
             device = self.devices[self.device_select.entry_widget.value[0]]
             self.device_select.entry_widget.value = []
-            global running
-            running = False
             device.stop()
 
     def mute(self):
@@ -200,11 +256,32 @@ class Dlna(npyscreen.FormWithMenus):
                 self.devices.append(device)
         self.device_select.values = [Text(i) for i in self.devices]
         logger.debug(self.devices)
-        if self.editing:
-            self.display()
 
     def refresh_device(self):
-        Thread(target=Dlna.discover, args=(self,), daemon=True).start()
+        t = Thread(target=Dlna.discover, args=(self,), daemon=True)
+        t.start()
+        return t
+
+    def refresh_quality(self):
+        t = Thread(target=Dlna.get_quality_info, args=(self,), daemon=True)
+        t.start()
+        return t
+
+    def _refresh(self):
+        def t():
+            self.refresh_device().join()
+            self.refresh_quality().join()
+            if self.editing:
+                self.display()
+
+        Thread(target=t).start()
+
+    def get_quality_info(self):
+        self.quality_dict = {'default': self.parentApp._cli._disk.get_download_url(self.file_info.id)}
+        self.quality_dict.update(
+            self.parentApp._cli._disk.get_play_info(file_id=self.file_info.id, category=self.file_info.category))
+        self.quality_select.values = list(self.quality_dict.keys())
+        logger.debug(self.quality_dict)
 
     def volume_changed_callback(self, widget):
         if len(self.devices) and self.device_select.entry_widget.value and self._volume != widget.value:

@@ -1,13 +1,17 @@
 import base64
+import ctypes
 import hashlib
+import inspect
 import json
 import logging
 import os
+import socket
 import sys
 
 import rsa
 
-__all__ = ['ROOT_DIR', 'logger', 'log_file', 'get_sha1', 'str_of_size', 'Iter', 'encrypt', 'parse_biz_ext']
+__all__ = ['ROOT_DIR', 'logger', 'log_file', 'get_sha1', 'str_of_size', 'Iter', 'encrypt', 'parse_biz_ext',
+           'stop_thread', 'get_open_port']
 
 ROOT_DIR = os.path.dirname(os.path.realpath(sys.argv[0]))
 LOG_LEVEL = logging.INFO
@@ -102,3 +106,31 @@ def parse_biz_ext(biz_ext):
     biz_ext = base64.b64decode(biz_ext).decode('gbk')
     logger.debug(biz_ext)
     return json.loads(biz_ext)
+
+
+def _async_raise(tid, exctype):
+    """raises the exception, performs cleanup if needed"""
+    tid = ctypes.c_long(tid)
+    if not inspect.isclass(exctype):
+        exctype = type(exctype)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exctype))
+    if res == 0:
+        raise ValueError("invalid thread id")
+    elif res != 1:
+        # """if it returns a number greater than one, you're in trouble,
+        # and you should call it again with exc=NULL to revert the effect"""
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+        raise SystemError("PyThreadState_SetAsyncExc failed")
+
+
+def stop_thread(thread):
+    _async_raise(thread.ident, SystemExit)
+
+
+def get_open_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('', 0))
+    s.listen(1)
+    port = s.getsockname()[1]
+    s.close()
+    return port

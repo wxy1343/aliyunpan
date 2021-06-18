@@ -69,7 +69,7 @@ class AliyunPan(object):
         logger.info('Logging in.')
         r = self._req.req(**LOGIN, access_token=False)
         logger.debug(r.json())
-        if 'bizExt' in r.json()['content']['data']:
+        try:
             data = parse_biz_ext(r.json()['content']['data']['bizExt'])
             logger.debug(data)
             access_token = data['pds_login_result']['accessToken']
@@ -82,6 +82,8 @@ class AliyunPan(object):
             self._drive_id = drive_id
             GLOBAL_VAR.drive_id = drive_id
             return self._refresh_token
+        except KeyError:
+            pass
         raise LoginFailed
 
     def get_file_list(self, parent_file_id: str = 'root', next_marker: str = None) -> list:
@@ -608,10 +610,9 @@ class AliyunPan(object):
         return file_list
 
     def get_play_info(self, file_id, expire_sec=14400, category=None):
-        if category == 'video':
-            url = 'https://api.aliyundrive.com/v2/databox/get_video_play_info'
-        elif category == 'audio':
-            url = 'https://api.aliyundrive.com/v2/databox/get_audio_play_info'
+        url = 'https://api.aliyundrive.com/v2/databox/get_{}_play_info'
+        if category:
+            url = url.format(category)
         else:
             return {}
         json = {'drive_id': self.drive_id, 'file_id': file_id, 'expire_sec': expire_sec}
