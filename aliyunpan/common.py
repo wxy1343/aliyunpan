@@ -114,6 +114,11 @@ class OutPut(object):
 
     @property
     @abstractmethod
+    def output(self):
+        pass
+
+    @output.setter
+    @abstractmethod
     def output(self, value):
         pass
 
@@ -139,7 +144,9 @@ class OutPutSingleton(OutPut):
     def __del__(self):
         self._stdout.write('\n')
 
-    output = property(lambda self: self._print, lambda self, value: self._print.send(value))
+    output = property(lambda self: self._print,
+                      lambda self, value: (self._lock.acquire(), setattr(self, '_', None),
+                                           self._print.send(value), self._lock.release())[1])
 
     def _output_gen(self):
         last_info = None
@@ -191,7 +198,9 @@ class Printer(OutPut):
         self._output = True
 
     output = property(lambda self: self._print.output,
-                      lambda self, value: self._print.output.send(value) if self._output else None)
+                      lambda self, value: (
+                          self._lock.acquire(), setattr(self._print, 'output', value),
+                          self._lock.release())[1] if self._output else None)
 
     def get_info(self, status, path, *args, existed=False, target_path=None, refresh_line=False):
         path_info = str(path) + self._link_info + str(target_path) if target_path else str(path)

@@ -1,9 +1,9 @@
 import sys
-import sys
 import time
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
+from threading import RLock
 
 import requests
 
@@ -32,12 +32,13 @@ class AliyunPan(object):
         self._drive_id_gen_ = self._drive_id_gen()
         self._chunk_size = 524288
         self._print = Printer()
+        self._lock = RLock()
 
     refresh_token = property(lambda self: self._refresh_token,
                              lambda self, value: setattr(self, '_refresh_token', value))
-    access_token = property(lambda self: next(self._access_token_gen_),
+    access_token = property(lambda self: (self._lock.acquire(), next(self._access_token_gen_), self._lock.release())[1],
                             lambda self, value: setattr(self, '_access_token', value))
-    drive_id = property(lambda self: next(self._drive_id_gen_),
+    drive_id = property(lambda self: (self._lock.acquire(), next(self._drive_id_gen_), self._lock.release())[1],
                         lambda self, value: setattr(self, '_drive_id', value))
 
     def login(self, username: str = None, password: str = None):
@@ -215,7 +216,17 @@ class AliyunPan(object):
         # 申请创建文件
         url = 'https://api.aliyundrive.com/v2/file/create'
         logger.info(f'Create file {file_name} in file {parent_file_id}.')
-        r = self._req.post(url, json=j)
+        retry_num = 3
+        while retry_num:
+            try:
+                r = self._req.post(url, json=j)
+            except requests.exceptions.RequestException:
+                logger.error(sys.exc_info())
+                retry_num -= 1
+            else:
+                break
+        else:
+            raise requests.exceptions.RequestException
         logger.debug(j)
         if force and 'exist' in r.json():
             self.delete_file(r.json()['file_id'])
