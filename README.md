@@ -154,17 +154,22 @@ python main.py COMMAND -h
                 <td>ls,search</td>
                 <td>-l</td>
                 <td>查看详情</td>
-            </tr>
+            </tr>        
+            <tr>
+                <td>share</td>
+                <td>-p, --file</td>
+                <td>指定文件(多个)</td>
+            </tr> 
             <tr>
                 <td>share</td>
                 <td>-f, --file-id</td>
-                <td>指定file_id</td>
+                <td>指定file_id(多个)</td>
             </tr>        
             <tr>
                 <td>share</td>
                 <td>-t, --expire-sec</td>
                 <td>分享过期时间(秒)，默认最大14400</td>
-            </tr>        
+            </tr>
             <tr>
                 <td>share</td>
                 <td>-l, --share-link</td>
@@ -180,6 +185,11 @@ python main.py COMMAND -h
                 <td>-s, --save</td>
                 <td>保存序列文件到云盘和本地</td>
             </tr>        
+            <tr>
+                <td>share</td>
+                <td>-S, --share-official</td>
+                <td>官方分享功能(需要账号支持)</td>
+            </tr>         
             <tr>
                 <td>upload</td>
                 <td>-p, --file</td>

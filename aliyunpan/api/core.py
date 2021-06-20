@@ -1,6 +1,8 @@
 import sys
+import sys
 import time
 from collections.abc import Iterable
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -11,7 +13,7 @@ from aliyunpan.api.utils import *
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, \
     InvalidContentHash, UploadUrlExpired, UploadUrlFailedRefresh, PartNumberOverLimit, BadResponseCode, \
-    PartNotSequential
+    PartNotSequential, InvalidExpiration
 
 __all__ = ['AliyunPan']
 
@@ -615,14 +617,35 @@ class AliyunPan(object):
             url = url.format(category)
         else:
             return {}
-        json = {'drive_id': self.drive_id, 'file_id': file_id, 'expire_sec': expire_sec}
-        r = self._req.post(url, json=json)
+        j = {'drive_id': self.drive_id, 'file_id': file_id, 'expire_sec': expire_sec}
+        r = self._req.post(url, json=j)
+        if r.status_code != 200:
+            return {}
         if 'code' in r.json() and r.json()['code'] == AliyunpanCode.not_found_file:
             return {}
         play_dict = {}
         if 'template_list' in r.json():
             for i in r.json()['template_list']:
                 if i['status']:
-                    play_dict[i['template_id']] = i['url']
+                    try:
+                        play_dict[i['template_id']] = i['url']
+                    except KeyError:
+                        pass
             return play_dict
         return {}
+
+    def share_link(self, file_id_list: list, expiration=''):
+        url = 'https://api.aliyundrive.com/adrive/v2/share_link/create'
+        if expiration:
+            expiration = datetime.fromtimestamp(float(expiration) + time.timezone) \
+                             .strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        j = {'drive_id': self.drive_id, 'file_id_list': file_id_list, 'expiration': expiration}
+        r = self._req.post(url, json=j)
+        if 'code' in r.json():
+            if r.json()['code'] == AliyunpanCode.Forbidden:
+                return ''
+            elif r.json()['code'] == AliyunpanCode.InvalidExpiration:
+                raise InvalidExpiration
+            else:
+                return ''
+        return r.json()['share_url']

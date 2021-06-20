@@ -464,7 +464,7 @@ class Commander:
         r.encoding = encoding
         return r.text
 
-    def share(self, path, file_id, expire_sec, share_link, download_link, save):
+    def share(self, path, expire_sec, share_link, download_link, save):
         def share_(path, file_id, parent_file=''):
             if path:
                 file_node = self._path_list.get_path_node(path, update=False)
@@ -495,7 +495,9 @@ class Commander:
         GLOBAL_VAR.txt += '*' * 50 + '\n'
         GLOBAL_VAR.txt += '项目地址: https://github.com/wxy1343/aliyunpan' + '\n'
         GLOBAL_VAR.txt += '*' * 50 + '\n\n'
-        share_(path, file_id)
+        if expire_sec is None:
+            expire_sec = 14400
+        share_(path, file_id=None)
         if save:
             file_name = Path(path).name + f'{int(time.time())}.txt'
             with open(file_name, 'w', encoding='utf-8') as f:
@@ -579,3 +581,13 @@ class Commander:
             for path_ in p.iterdir():
                 change_file_list.append(path_)
         return list(set(change_file_list))
+
+    def share_link(self, path_list, file_id_list=None, expiration=None):
+        t = '' if expiration is None else time.time() + expiration
+        if not file_id_list:
+            file_id_list = [self._path_list.get_path_fid(path, update=False) for path in path_list if path]
+        file_id_list = list(filter(None, file_id_list))
+        if file_id_list:
+            print(self._disk.share_link(file_id_list, t))
+        else:
+            raise FileNotFoundError

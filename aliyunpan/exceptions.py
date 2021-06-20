@@ -53,6 +53,10 @@ class InvalidContentHash(InvalidParameter):
     """Hash不匹配"""
 
 
+class InvalidExpiration(InvalidParameter):
+    """错误的Expiration"""
+
+
 class RequestExpired(AliyunpanException):
     """请求过期"""
 
@@ -97,3 +101,5 @@ class AliyunpanCode(object):
     request_expired = 403
     part_already_exist = 409
     part_not_sequential = 400
+    Forbidden = 'Forbidden'
+    InvalidExpiration = 'InvalidParameter.Expiration'

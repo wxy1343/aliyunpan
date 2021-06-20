@@ -6,7 +6,7 @@ from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
-__version__ = '2.4.2'
+__version__ = '2.5.0'
 
 
 @click.group(cls=ClickAliasedGroup)
@@ -129,15 +129,25 @@ def tree(path):
 @cli.command(aliases=['s'], help='Share file sharing link.')
 @click.help_option('-h', '--help')
 @click.argument('path', type=click.Path(), default='')
-@click.option('-f', '--file-id', type=click.STRING, default='', help='File id.')
-@click.option('-t', '--expire-sec', type=click.INT, default=14400, help='Link expiration time(Max 14400).',
-              show_default=True)
+@click.option('-p', '--file', multiple=True, help='Select multiple files.', type=click.Path())
+@click.option('-f', '--file-id', multiple=True, type=click.STRING, help='File id.')
+@click.option('-t', '--expire-sec', type=click.INT, help='Link expiration time(Max 14400 or permanent).')
 @click.option('-l', '--share-link', is_flag=True, help='Output share link.', default=True, show_default=True)
 @click.option('-d', '--download-link', is_flag=True, help='Output download link.', show_default=True)
 @click.option('-s', '--save', is_flag=True, help='Save to cloud disk and local.', show_default=True)
-def share(path, file_id, expire_sec, share_link, download_link, save):
-    if path or file_id:
-        commander.share(path, file_id, expire_sec, share_link, download_link, save)
+@click.option('-S', '--share-official', is_flag=True, help='Output official share link.', show_default=True)
+def share(path, file, file_id, expire_sec, share_link, download_link, save, share_official):
+    if not path and not file and not file_id:
+        raise click.MissingParameter(param=click.get_current_context().command.params[2])
+    else:
+        path_list = list(filter(None, {*file, path}))
+        file_id_list = list(filter(None, {*file_id}))
+    if share_official:
+        commander.share_link(path_list, file_id_list, expire_sec)
+    elif path_list:
+        for path in path_list:
+            if path:
+                commander.share(path, expire_sec, share_link, download_link, save)
     else:
         raise click.MissingParameter(param=click.get_current_context().command.params[1])
 

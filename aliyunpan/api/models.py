@@ -98,6 +98,8 @@ class PathList:
             self.auto_update_path_list(update, file_id)
         except NodeIDAbsentError:
             return list(map(self.get_file_info, self._disk.get_file_list(file_id)))
+        if not self._tree.get_node(file_id):
+            return []
         if file_id != 'root' and self._tree.get_node(file_id).data.type:
             return [self._tree.get_node(file_id).data]
         return [i.data for i in self._tree.children(file_id)]
