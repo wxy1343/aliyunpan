@@ -247,7 +247,7 @@ class Dlna(npyscreen.FormWithMenus):
             device = self.devices[self.device_select.entry_widget.value[0]]
             device.unmute()
 
-    def discover(self):
+    def discover(self, display=True):
         self.name = 'Refresh Device...'
         allDevices = self.dlnap.discover(st=self.dlnap.URN_AVTransport)
         self.name = str(Text(self.file_info.name))
@@ -256,32 +256,36 @@ class Dlna(npyscreen.FormWithMenus):
                 self.devices.append(device)
         self.device_select.values = [Text(i) for i in self.devices]
         logger.debug(self.devices)
+        if display:
+            self.display()
 
-    def refresh_device(self):
-        t = Thread(target=Dlna.discover, args=(self,), daemon=True)
+    def refresh_device(self, display=True):
+        t = Thread(target=Dlna.discover, args=(self, display), daemon=False)
         t.start()
         return t
 
-    def refresh_quality(self):
-        t = Thread(target=Dlna.get_quality_info, args=(self,), daemon=True)
+    def refresh_quality(self, display=True):
+        t = Thread(target=Dlna.get_quality_info, args=(self, display), daemon=False)
         t.start()
         return t
 
     def _refresh(self):
         def t():
-            self.refresh_device().join()
-            self.refresh_quality().join()
+            self.refresh_device(display=False).join()
+            self.refresh_quality(display=False).join()
             if self.editing:
                 self.display()
 
         Thread(target=t).start()
 
-    def get_quality_info(self):
+    def get_quality_info(self, display=True):
         self.quality_dict = {'default': self.parentApp._cli._disk.get_download_url(self.file_info.id)}
         self.quality_dict.update(
             self.parentApp._cli._disk.get_play_info(file_id=self.file_info.id, category=self.file_info.category))
         self.quality_select.values = list(self.quality_dict.keys())
         logger.debug(self.quality_dict)
+        if display:
+            self.display()
 
     def volume_changed_callback(self, widget):
         if len(self.devices) and self.device_select.entry_widget.value and self._volume != widget.value:

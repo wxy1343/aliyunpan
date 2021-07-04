@@ -2,7 +2,7 @@ treelib==1.6.1
 requests~=2.25.1
 click_aliases==1.0.1
 rsa==4.0
-click==7.1.1
+click==7.1.2
 ruamel.base==1.0.0
 ruamel.yaml
 colorama~=0.4.3
@@ -11,3 +11,4 @@ windows-curses;platform_system=="Windows"
 pyperclip~=1.8.1
 aria2p
 Flask
+PyExecJS

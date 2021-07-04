@@ -7,6 +7,7 @@ from threading import RLock
 
 import requests
 
+from aliyunpan.api import ua
 from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo
 from aliyunpan.api.utils import *
@@ -67,6 +68,7 @@ class AliyunPan(object):
                 'loginId': username,
                 'password2': password2,
                 'appName': 'aliyun_drive',
+                'ua': ua.get_ua()
             }
         }
         logger.info('Logging in.')

@@ -18,12 +18,19 @@ git clone https://github.com/wxy1343/aliyunpan --recurse-submodules
 
 ### 注意
 
-* web端获取的refresh_token暂时无法分享
+* web端获取的refresh_token有防盗链检测
 
 1. 可以指定账号密码登入
 2. 可以通过手机端查找日志获取refresh_token
 
 > /sdcard/Android/data/com.alicloud.databox/files/logs/trace/userId/yunpan/latest.log
+
+* 登录api加入了ua检测，需要运行混淆的js代码来获取ua
+* 推荐安装 [node.js](https://nodejs.org) 和 [jsdom](https://github.com/jsdom/jsdom) 模块来运行js代码
+
+```shell
+npm install jsdom
+```
 
 ### 配置refresh_token
 
