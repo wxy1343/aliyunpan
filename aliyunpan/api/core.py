@@ -14,7 +14,7 @@ from aliyunpan.api.utils import *
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, \
     InvalidContentHash, UploadUrlExpired, UploadUrlFailedRefresh, PartNumberOverLimit, BadResponseCode, \
-    PartNotSequential, InvalidExpiration
+    PartNotSequential, InvalidExpiration, FileShareNotAllowed
 
 __all__ = ['AliyunPan']
 
@@ -277,14 +277,14 @@ class AliyunPan(object):
                 path_list.extend(GLOBAL_VAR.tasks[content_hash].path)
             else:
                 path_list.append(GLOBAL_VAR.tasks[content_hash].path)
-            path_list = list(set([str(Path(path_).absolute()) for path_ in path_list]))
+            path_list = list(set([str(Path(path_).resolve()) for path_ in path_list]))
             flag = False
             # 云盘是否存在该文件
             if GLOBAL_VAR.tasks[content_hash].upload_time and path_list:
                 existed = True
                 for path_ in path_list:
                     # 是否存在路径
-                    if path.absolute() == Path(path_).absolute():
+                    if path.resolve() == Path(path_).resolve():
                         flag = True
                         break
             # 云盘存在该文件且存在路径且断点续传
@@ -293,7 +293,7 @@ class AliyunPan(object):
                 self._print.upload_info(path, status=True, existed=True)
                 self._print.print_line()
                 GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
-                GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
+                GLOBAL_VAR.file_set.add((content_hash, str(path.resolve())))
                 return GLOBAL_VAR.tasks[content_hash].file_id
         # 断点续传且已存在任务且云盘不存在该文件
         if c and content_hash in GLOBAL_VAR.tasks and not existed:
@@ -306,9 +306,9 @@ class AliyunPan(object):
                 part_info_list = self.get_upload_url(path, upload_id, file_id, self._chunk_size, part_number)
                 if not part_info_list:
                     # 重新上传
-                    if str(path.absolute()) in path_list:
+                    if str(path.resolve()) in path_list:
                         # 删除未上传成功的任务
-                        del path_list[str(path.absolute())]
+                        del path_list[str(path.resolve())]
                     GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
                     return self.upload_file(parent_file_id=parent_file_id, path=path, upload_timeout=upload_timeout,
                                             retry_num=retry_num, force=force, chunk_size=self._chunk_size, c=c)
@@ -316,10 +316,10 @@ class AliyunPan(object):
                 # 漏网之鱼
                 self._print.upload_info(path, status=True, existed=True)
                 self._print.print_line()
-                path_list.append(str(path.absolute()))
+                path_list.append(str(path.resolve()))
                 path_list = list(set(path_list))
                 GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
-                GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
+                GLOBAL_VAR.file_set.add((content_hash, str(path.resolve())))
                 return GLOBAL_VAR.tasks[content_hash].file_id
         else:
             # 申请创建文件
@@ -329,7 +329,7 @@ class AliyunPan(object):
                 message = r.json()['message']
                 logger.error(message)
                 raise AliyunpanException(message)
-            task_info = {'path': str(path.absolute()), 'upload_id': None,
+            task_info = {'path': str(path.resolve()), 'upload_id': None,
                          'file_id': None, 'chunk_size': self._chunk_size,
                          'part_number': None}
             rapid_upload = r.json()['rapid_upload']
@@ -341,10 +341,10 @@ class AliyunPan(object):
                 task_info['file_id'] = file_id
                 task_info['upload_time'] = time.time()
                 GLOBAL_VAR.tasks[content_hash] = task_info
-                GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
+                GLOBAL_VAR.file_set.add((content_hash, str(path.resolve())))
                 if existed:
                     # 同hash不同路径
-                    path_list.append(str(path.absolute()))
+                    path_list.append(str(path.resolve()))
                     path_list = list(set(path_list))
                     GLOBAL_VAR.tasks[content_hash].path = path_list[0] if len(path_list) == 1 else path_list
                 return file_id
@@ -436,14 +436,14 @@ class AliyunPan(object):
             file_info = self.complete(file_id, upload_id)
         except InvalidContentHash:
             upload_bar.upload_info(path, status=False, refresh_line=True)
-            if Path(log_file).absolute() != path.absolute():
+            if Path(log_file).resolve() != path.resolve():
                 raise
         if file_info:
             upload_bar.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
                                    refresh_line=True)
             self._print.print_line()
             GLOBAL_VAR.tasks[content_hash].upload_time = time.time()
-            GLOBAL_VAR.file_set.add((content_hash, str(path.absolute())))
+            GLOBAL_VAR.file_set.add((content_hash, str(path.resolve())))
             return file_info
         else:
             upload_bar.upload_info(path, status=False, refresh_line=True)
@@ -659,6 +659,8 @@ class AliyunPan(object):
                 return ''
             elif r.json()['code'] == AliyunpanCode.InvalidExpiration:
                 raise InvalidExpiration
+            elif r.json()['code'] == AliyunpanCode.FileShareNotAllowed:
+                raise FileShareNotAllowed(r.json()['message'])
             else:
                 return ''
         return r.json()['share_url']

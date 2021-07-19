@@ -93,6 +93,10 @@ class PartNotSequential(AliyunpanException):
                                'you must upload or complete parts with sequential part number.'
 
 
+class FileShareNotAllowed(AliyunpanException):
+    """文件无法分享"""
+
+
 class AliyunpanCode(object):
     existed = 'AlreadyExist.File'
     token_invalid = 'AccessTokenInvalid'
@@ -103,3 +107,4 @@ class AliyunpanCode(object):
     part_not_sequential = 400
     Forbidden = 'Forbidden'
     InvalidExpiration = 'InvalidParameter.Expiration'
+    FileShareNotAllowed = 'FileShareNotAllowed'

@@ -591,3 +591,19 @@ class Commander:
             print(self._disk.share_link(file_id_list, t))
         else:
             raise FileNotFoundError
+
+    @property
+    def req(self):
+        return self._req
+
+    @property
+    def config(self):
+        return self._config
+
+    @property
+    def path_list(self):
+        return self._path_list
+
+    @property
+    def disk(self):
+        return self._disk

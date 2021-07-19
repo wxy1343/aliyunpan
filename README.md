@@ -25,8 +25,8 @@ git clone https://github.com/wxy1343/aliyunpan --recurse-submodules
 
 > /sdcard/Android/data/com.alicloud.databox/files/logs/trace/userId/yunpan/latest.log
 
-* 登录api加入了ua检测，需要运行混淆的js代码来获取ua
-* 推荐安装 [node.js](https://nodejs.org) 和 [jsdom](https://github.com/jsdom/jsdom) 模块来运行js代码
+* ~~登录api加入了ua检测，需要运行混淆的js代码来获取ua~~
+* ~~推荐安装 [node.js](https://nodejs.org) 和 [jsdom](https://github.com/jsdom/jsdom) 模块来运行js代码~~
 
 ```shell
 npm install jsdom
@@ -219,7 +219,7 @@ python main.py COMMAND -h
             </tr>
             <tr>
                 <td>upload</td>
-                <td>-s, share</td>
+                <td>-s, --share</td>
                 <td>指定分享的序列文件</td>
             </tr> 
             <tr>
