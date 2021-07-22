@@ -36,8 +36,9 @@ class Commander:
     def __del__(self):
         self._task_config.write(GLOBAL_VAR.tasks)
 
-    def init(self, config_file=None, refresh_token=None, username=None, password=None, depth=3):
+    def init(self, config_file=None, refresh_token=None, username=None, password=None, depth=3, timeout=None):
         self._path_list.depth = depth
+        self._req.timeout = timeout
         if config_file:
             self._config_set.add(config_file)
         config_file = list(

@@ -103,20 +103,24 @@ python main.py -h
                 <td>指定配置文件</td>
             </tr>
             <tr>
-                <td>-t</td>
+                <td>-t,--refresh-token</td>
                 <td>指定REFRESH_TOKEN</td>
             </tr>
             <tr>
-                <td>-u</td>
+                <td>-u,--username</td>
                 <td>指定账号</td>
             </tr>
             <tr>
-                <td>-p</td>
+                <td>-p,--password</td>
                 <td>指定密码</td>
             </tr>
             <tr>
                 <td>-d, --depth</td>
                 <td>文件递归深度</td>
+            </tr>
+            <tr>
+                <td>-T, --timeout</td>
+                <td>请求超时时间(秒)</td>
             </tr>
         </tbody>
     </table>
