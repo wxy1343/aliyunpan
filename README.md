@@ -306,6 +306,11 @@ python main.py upload -s "aliyunpan://示例文件夹|80E7E25109D4246653B600FDFE
 * 退出(ctrl+c)
 * 切换标签(↑↓←→,kjhl,TAB)
 
+### 环境变量
+
+```ALIYUNPAN_CONF``` 配置文件路径  
+```ALIYUNPAN_ROOT``` 根目录(log和tasks输出路径)
+
 ## 致谢
 
 感谢 [zhjc1124/aliyundrive](https://github.com/zhjc1124/aliyundrive) 的登录接口参考

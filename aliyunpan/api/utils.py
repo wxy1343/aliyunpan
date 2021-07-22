@@ -7,21 +7,23 @@ import logging
 import os
 import socket
 import sys
+from pathlib import Path
 
 import rsa
 
 __all__ = ['ROOT_DIR', 'logger', 'log_file', 'get_sha1', 'str_of_size', 'Iter', 'encrypt', 'parse_biz_ext',
            'stop_thread', 'get_open_port']
 
-ROOT_DIR = os.path.dirname(os.path.realpath(sys.argv[0]))
+ROOT_DIR = str(Path(os.environ.get('ALIYUNPAN_ROOT')).resolve().absolute()) if os.environ.get(
+    'ALIYUNPAN_ROOT') else os.path.dirname(os.path.realpath(sys.argv[0]))
 LOG_LEVEL = logging.INFO
-logger = logging.getLogger('aliyunpan')
 log_file = ROOT_DIR + os.sep + 'aliyunpan.log'
 fmt_str = "%(asctime)s [%(filename)s:%(lineno)d] %(funcName)s %(levelname)s - %(message)s"
 logging.basicConfig(level=LOG_LEVEL,
                     format=fmt_str,
                     stream=open(log_file, 'a', encoding='utf-8'),
                     datefmt="%Y-%m-%d %H:%M:%S")
+logger = logging.getLogger('aliyunpan')
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
