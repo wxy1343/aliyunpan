@@ -6,7 +6,7 @@ from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
-__version__ = '2.5.4'
+__version__ = '2.5.5'
 
 
 @click.group(cls=ClickAliasedGroup)
@@ -14,21 +14,22 @@ __version__ = '2.5.4'
 @click.version_option(version=__version__)
 @click.option('-c', '--config-file', type=click.Path(), help='Specify the configuration file.',
               default='~/.config/aliyunpan.yaml', show_default=True)
-@click.option('-t', 'refresh_token', type=click.STRING, help='Specify REFRESH_TOKEN.')
-@click.option('-u', 'username', type=click.STRING, help='Specify USERNAME.')
-@click.option('-p', 'password', type=click.STRING, help='Specify PASSWORD.')
+@click.option('-t', '--refresh-token', type=click.STRING, help='Specify REFRESH_TOKEN.')
+@click.option('-u', '--username', type=click.STRING, help='Specify USERNAME.')
+@click.option('-p', '--password', type=click.STRING, help='Specify PASSWORD.')
 @click.option('-d', '--depth', type=click.INT, help='File recursion depth.', default=3, show_default=True)
-@click.option('--debug', is_flag=True, help='Debug mode.')
-def cli(config_file, refresh_token, username, password, depth, debug):
+@click.option('-D', '--debug', is_flag=True, help='Debug mode.')
+@click.option('-T', '--timeout', type=click.FLOAT, help='Api request timeout.')
+def cli(config_file, refresh_token, username, password, depth, debug, timeout):
     logger.info(f'Version:{__version__}')
     if debug:
         logger.setLevel('DEBUG')
     if refresh_token:
-        commander.init(refresh_token=refresh_token, depth=depth)
+        commander.init(refresh_token=refresh_token, depth=depth, timeout=timeout)
     elif username:
-        commander.init(username=username, password=password, depth=depth)
+        commander.init(username=username, password=password, depth=depth, timeout=timeout)
     elif config_file:
-        commander.init(config_file=config_file, depth=depth)
+        commander.init(config_file=config_file, depth=depth, timeout=timeout)
     else:
         raise ConfigurationFileNotFoundError
 

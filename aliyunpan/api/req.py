@@ -14,7 +14,18 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class Req:
+    _instance = None
+    _first_init = True
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self, disk=None):
+        if not self._first_init:
+            return
+        self._first_init = False
         self._disk = disk
         self._retry_num = 3
         self._session = requests.Session()
@@ -22,9 +33,14 @@ class Req:
         self._verify = False
         self._host_url = 'https://www.aliyundrive.com/'
         self._headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
-            'Referer': self._host_url,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/87.0.4280.88 Safari/537.36',
+            'Referer': self._host_url
         }
+
+    timeout = property(lambda self: self._timeout, lambda self, value: setattr(self, '_timeout', value))
+    verify = property(lambda self: self._verify, lambda self, value: setattr(self, '_verify', value))
+    retry_num = property(lambda self: self._retry_num, lambda self, value: setattr(self, '_retry_num', value))
 
     def _req(self, method, *args, **kwargs):
         try:
