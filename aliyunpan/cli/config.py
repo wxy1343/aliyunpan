@@ -3,6 +3,7 @@ from pathlib import Path
 from ruamel.yaml import YAML
 
 from aliyunpan.common import DATA
+from aliyunpan.exceptions import InvalidConfiguration
 
 __all__ = ['Config']
 
@@ -41,9 +42,12 @@ class Config:
 
     def get(self, key):
         conf = self.read()
-        if key in conf.keys():
-            value = conf.get(key)
-            return value
+        try:
+            if key in conf.keys():
+                value = conf.get(key)
+                return value
+        except AttributeError:
+            raise InvalidConfiguration
         return None
 
     def update(self, key, value):
