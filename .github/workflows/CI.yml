@@ -1,0 +1,101 @@
+name: CI
+
+# Controls when the action will run. 
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    tags:
+      - v*
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+        with:
+          repository: wxy1343/aliyunpan
+          submodules: recursive
+
+      - uses: actions/setup-python@v2
+
+      - uses: kenchan0130/actions-system-info@master
+        id: system-info
+
+      - name: Declare some variables
+        id: vars
+        shell: bash
+        run: |
+          echo "::set-output name=sha_short::$(git rev-parse --short "$GITHUB_SHA")"
+          echo "##[set-output name=arch;]$(arch)"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: get version
+        id: version
+        run: echo "##[set-output name=version;]$(python main.py --version | cut -d ' ' -f3 | awk '$1=$1')"
+
+      - name: set tag name
+        id: tag
+        run: echo "##[set-output name=name;]$(echo v${{ steps.version.outputs.version }}-${{ steps.vars.outputs.sha_short }})"
+
+      - name: set application name
+        id: application
+        run: echo "##[set-output name=name;]$(echo aliyunpan-cli-${{ runner.os }}-$(arch)-${{ steps.tag.outputs.name }})"
+
+      - name: run pyinstaller
+        run: pyinstaller -F main.py -n aliyunpan-cli
+
+      - run: |
+          chmod +x dist/*
+          tar -zcvf ${{ steps.application.outputs.name }}.tar.gz -C dist .
+
+      - uses: mukunku/tag-exists-action@v1.0.0
+        id: checkTag
+        with:
+          tag: ${{ steps.tag.outputs.name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        if: ${{ steps.checkTag.outputs.exists == 'false' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          release_name: aliyunpan-cli-${{ steps.tag.outputs.name }}
+          draft: false
+          prerelease: false
+
+      - name: Gets latest created release info
+        id: latest_release_info
+        uses: jossef/action-latest-release-info@v1.1.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.latest_release_info.outputs.upload_url }}
+          asset_path: ${{ steps.application.outputs.name }}.tar.gz
+          asset_name: ${{ steps.application.outputs.name }}.tar.gz
+          asset_content_type: application/gzip

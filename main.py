@@ -6,7 +6,7 @@ from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
-__version__ = '2.5.5'
+__version__ = '2.5.6'
 
 
 @click.group(cls=ClickAliasedGroup)
