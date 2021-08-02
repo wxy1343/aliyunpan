@@ -148,7 +148,7 @@ python main.py COMMAND -h
             </tr>
             <tr>
                 <td>download</td>
-                <td>-s, share</td>
+                <td>-s, --share</td>
                 <td>指定分享的序列文件</td>
             </tr>
             <tr>

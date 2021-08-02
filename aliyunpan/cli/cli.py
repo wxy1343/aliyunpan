@@ -39,15 +39,20 @@ class Commander:
     def init(self, config_file=None, refresh_token=None, username=None, password=None, depth=3, timeout=None):
         self._path_list.depth = depth
         self._req.timeout = timeout
+        config_file_list = list(
+            filter(lambda x: get_real_path(x).is_file(), map(lambda x: get_real_path(x), self._config_set)))
         if config_file:
-            self._config_set.add(config_file)
-        config_file = list(
-            filter(lambda x: Path(x).is_file(), map(lambda x: Path(x).expanduser(), self._config_set)))
-        if config_file and config_file[0]:
-            self._config.config_file = config_file[0]
-            aria2 = self._config.get('aria2') or {'host': 'http://localhost', 'port': 6800}
-            if aria2:
-                self._aria2 = self.aria2_init(**aria2)
+            if not get_real_path(config_file).is_file():
+                raise ConfigurationFileNotFoundError
+            self._config.config_file = get_real_path(config_file)
+        elif config_file_list and config_file_list[0]:
+            self._config.config_file = config_file_list[0]
+        if self._config.config_file and self._config.get('aria2'):
+            aria2 = self._config.get('aria2')
+        else:
+            aria2 = {'host': 'http://localhost', 'port': 6800}
+        if aria2:
+            self._aria2 = self.aria2_init(**aria2)
         if refresh_token:
             if not len(refresh_token) == 32:
                 raise InvalidRefreshToken
@@ -56,7 +61,7 @@ class Commander:
             if not password:
                 raise InvalidPassword
             self._disk.login(username, password)
-        elif config_file:
+        elif config_file_list:
             refresh_token = self._config.get('refresh_token')
             username = self._config.get('username')
             password = self._config.get('password')

@@ -141,8 +141,8 @@ class OutPutSingleton(OutPut):
         self._print.__next__()
         self.print_line = False
 
-    def __del__(self):
-        self._stdout.write('\n')
+    # def __del__(self):
+    #     self._stdout.write('\n')
 
     output = property(lambda self: self._print,
                       lambda self, value: (self._lock.acquire(), setattr(self, '_', None),

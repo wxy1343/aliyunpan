@@ -12,7 +12,7 @@ from pathlib import Path
 import rsa
 
 __all__ = ['ROOT_DIR', 'logger', 'log_file', 'get_sha1', 'str_of_size', 'Iter', 'encrypt', 'parse_biz_ext',
-           'stop_thread', 'get_open_port']
+           'stop_thread', 'get_open_port', 'get_real_path']
 
 ROOT_DIR = str(Path(os.environ.get('ALIYUNPAN_ROOT')).resolve().absolute()) if os.environ.get(
     'ALIYUNPAN_ROOT') else os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -136,3 +136,7 @@ def get_open_port():
     port = s.getsockname()[1]
     s.close()
     return port
+
+
+def get_real_path(path):
+    return Path(path).expanduser().resolve().absolute()
