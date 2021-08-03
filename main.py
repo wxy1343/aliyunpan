@@ -4,9 +4,8 @@ from click_aliases import ClickAliasedGroup
 
 from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
-from aliyunpan.exceptions import ConfigurationFileNotFoundError
 
-__version__ = '2.5.7'
+__version__ = '2.6.0'
 
 
 @click.group(cls=ClickAliasedGroup)
@@ -20,18 +19,14 @@ __version__ = '2.5.7'
 @click.option('-d', '--depth', type=click.INT, help='File recursion depth.', default=3, show_default=True)
 @click.option('-D', '--debug', is_flag=True, help='Debug mode.')
 @click.option('-T', '--timeout', type=click.FLOAT, help='Api request timeout.')
-def cli(config_file, refresh_token, username, password, depth, debug, timeout):
+@click.option('-id', '--drive-id', type=click.STRING, help='Specify DRIVE_ID.')
+@click.option('-a', '--album', is_flag=True, help='Specify album')
+def cli(config_file, refresh_token, username, password, depth, debug, timeout, drive_id, album):
     logger.info(f'Version:{__version__}')
     if debug:
         logger.setLevel('DEBUG')
-    if refresh_token:
-        commander.init(refresh_token=refresh_token, depth=depth, timeout=timeout)
-    elif username:
-        commander.init(username=username, password=password, depth=depth, timeout=timeout)
-    elif config_file:
-        commander.init(config_file=config_file, depth=depth, timeout=timeout)
-    else:
-        raise ConfigurationFileNotFoundError
+    commander.init(config_file=config_file, refresh_token=refresh_token, username=username, password=password,
+                   depth=depth, timeout=timeout, drive_id=drive_id, album=album)
 
 
 @cli.command(aliases=['l', 'list', 'dir'], help='List files.')

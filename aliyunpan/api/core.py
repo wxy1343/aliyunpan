@@ -9,7 +9,7 @@ import requests
 
 from aliyunpan.api import ua
 from aliyunpan.api.req import *
-from aliyunpan.api.type import UserInfo
+from aliyunpan.api.type import UserInfo, AlibumInfo
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, \
@@ -21,9 +21,11 @@ __all__ = ['AliyunPan']
 
 class AliyunPan(object):
 
-    def __init__(self, refresh_token: str = None):
+    def __init__(self, refresh_token: str = None, album: bool = False):
         self._req = Req(self)
         self._user_info = None
+        self._alibum_info = None
+        self._album = album
         self._access_token = None
         self._drive_id = None
         self._username = None
@@ -41,6 +43,7 @@ class AliyunPan(object):
                             lambda self, value: setattr(self, '_access_token', value))
     drive_id = property(lambda self: (self._lock.acquire(), next(self._drive_id_gen_), self._lock.release())[1],
                         lambda self, value: setattr(self, '_drive_id', value))
+    album = property(lambda self: self._album, lambda self, value: setattr(self, '_album', value))
 
     def login(self, username: str = None, password: str = None):
         """
@@ -186,6 +189,16 @@ class AliyunPan(object):
         self._user_info = user_info
         GLOBAL_VAR.user_info = user_info
         return user_info
+
+    def get_albums_info(self) -> AlibumInfo:
+        url = 'https://api.aliyundrive.com/adrive/v1/user/albums_info'
+        r = self._req.post(url, json={})
+        data = r.json()['data']
+        drive_id = data['driveId']
+        drive_name = data['driveName']
+        alibum_info = AlibumInfo(drive_name=drive_name, drive_id=drive_id)
+        self._alibum_info = alibum_info
+        return alibum_info
 
     def create_file(self, file_name: str, parent_file_id: str = 'root', file_type: bool = False,
                     json: dict = None, force: bool = False) -> requests.models.Response:
@@ -539,7 +552,10 @@ class AliyunPan(object):
         获取drive_id
         :return:
         """
-        drive_id = self.get_user_info().drive_id
+        if self._album:
+            drive_id = self.get_albums_info().drive_id
+        else:
+            drive_id = self.get_user_info().drive_id
         self._drive_id = drive_id
         GLOBAL_VAR.drive_id = drive_id
         return drive_id
@@ -604,16 +620,19 @@ class AliyunPan(object):
             print(r.json()["message"])
         return False
 
-    def search(self, query: str, next_marker: str = None):
+    def search(self, query: str, raw=False, next_marker: str = None):
         """
         搜索文件
         :param query
+        :param raw
         :param next_marker
         """
         url = 'https://api.aliyundrive.com/v2/file/search'
+        if not raw:
+            query = f'name match \"{query}\"'
         json = {
             'drive_id': self.drive_id,
-            'query': f'name match \"{query}\"',
+            'query': query,
             'order_by': 'updated_at DESC'
         }
         r = self._req.post(url, json=json)
@@ -621,7 +640,7 @@ class AliyunPan(object):
             return []
         file_list = r.json()['items']
         if 'next_marker' in r.json() and r.json()['next_marker'] and next_marker != r.json()['next_marker']:
-            file_list.extend(self.search(query, r.json()['next_marker']))
+            file_list.extend(self.search(query, raw=raw, next_marker=r.json()['next_marker']))
         return file_list
 
     def get_play_info(self, file_id, expire_sec=14400, category=None):

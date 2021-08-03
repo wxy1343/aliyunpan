@@ -122,6 +122,14 @@ python main.py -h
                 <td>-T, --timeout</td>
                 <td>请求超时时间(秒)</td>
             </tr>
+            <tr>
+                <td>-id, --drive-id</td>
+                <td>指定drive_id</td>
+            </tr>
+            <tr>
+                <td>-a, --album</td>
+                <td>是否访问相册</td>
+            </tr>
         </tbody>
     </table>
 </details>
