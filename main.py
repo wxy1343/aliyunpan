@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import click
 from click_aliases import ClickAliasedGroup
 
 from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 
-__version__ = '2.6.0'
+__version__ = '2.6.1'
 
 
 @click.group(cls=ClickAliasedGroup)
