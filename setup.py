@@ -47,7 +47,7 @@ setup(
     ],
     keywords='aliyunpan, aliyundrive, cli, tui',
     py_modules=["main"],
-    packages=['aliyunpan', 'dlnap/dlnap'],
+    packages=['aliyunpan', 'aliyunpan/api', 'aliyunpan/cli', 'dlnap/dlnap'],
     python_requires='>=3.6, <4',
     install_requires=install_requires,
     data_files=[
