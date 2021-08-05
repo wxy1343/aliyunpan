@@ -2,7 +2,7 @@ import pathlib
 
 from setuptools import setup
 
-import main
+from aliyunpan.about import __version__
 
 here = pathlib.Path(__file__).parent.resolve()
 long_description = (here / 'README.md').read_text(encoding='utf-8')
@@ -15,7 +15,7 @@ with open('requirements.txt', 'r') as f:
         install_requires.append(req.strip('\n'))
 setup(
     name='aliyunpan',
-    version=main.__version__,
+    version=__version__,
     description='aliyunpan cli',
     long_description=long_description,
     long_description_content_type='text/markdown',

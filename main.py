@@ -3,11 +3,9 @@
 import click
 from click_aliases import ClickAliasedGroup
 
+from aliyunpan.about import __version__
 from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
-
-__version__ = '2.7.2'
-commander: Commander
 
 
 @click.group(cls=ClickAliasedGroup)
@@ -174,6 +172,9 @@ def sync(path, upload_path, time_out, chunk_size, retry, sync_time):
 @click.help_option('-h', '--help')
 def tui():
     commander.tui()
+
+
+commander: Commander
 
 
 def main():
