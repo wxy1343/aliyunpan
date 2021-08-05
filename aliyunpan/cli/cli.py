@@ -18,7 +18,7 @@ __all__ = ['Commander']
 
 
 class Commander:
-    def __init__(self):
+    def __init__(self, init=True, *args, **kwargs):
         self._disk = AliyunPan()
         self._path_list = PathList(self._disk)
         self._req = Req()
@@ -32,6 +32,8 @@ class Commander:
                             os.environ.get('ALIYUNPAN_CONF', '')}
         GLOBAL_VAR.tasks = self._task_config.read()
         GLOBAL_VAR.txt = ''
+        if init:
+            self.init(*args, **kwargs)
 
     def __del__(self):
         self._task_config.write(GLOBAL_VAR.tasks)

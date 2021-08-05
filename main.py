@@ -6,7 +6,8 @@ from click_aliases import ClickAliasedGroup
 from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 
-__version__ = '2.6.1'
+__version__ = '2.7.0'
+commander: Commander
 
 
 @click.group(cls=ClickAliasedGroup)
@@ -175,6 +176,11 @@ def tui():
     commander.tui()
 
 
-if __name__ == '__main__':
-    commander = Commander()
+def main():
+    global commander
+    commander = Commander(init=False)
     cli()
+
+
+if __name__ == '__main__':
+    main()

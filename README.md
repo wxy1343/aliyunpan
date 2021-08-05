@@ -1,5 +1,9 @@
 # aliyunpan
 
+[![Build Status](https://github.com/wxy1343/aliyunpan/workflows/CI/badge.svg)](https://github.com/wxy1343/aliyunpan/actions)
+[![GitHub](https://img.shields.io/github/license/wxy1343/aliyunpan)](https://github.com/wxy1343/aliyunpan/blob/main/LICENSE)
+![PyPI](https://img.shields.io/pypi/v/aliyunpan)
+
 ---
 
 阿里云盘cli  
@@ -7,6 +11,12 @@
 ~~低版本环境运行报错参考~~[~~issue9~~](https://github.com/wxy1343/aliyunpan/issues/9)
 
 ## 安装
+
+```shell
+pip install aliyunpan
+```
+
+## 克隆项目
 
 ```shell
 git clone https://github.com/wxy1343/aliyunpan --recurse-submodules
