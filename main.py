@@ -6,7 +6,7 @@ from click_aliases import ClickAliasedGroup
 from aliyunpan.api.utils import logger
 from aliyunpan.cli.cli import Commander
 
-__version__ = '2.7.0'
+__version__ = '2.7.1'
 commander: Commander
 
 

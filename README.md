@@ -2,7 +2,9 @@
 
 [![Build Status](https://github.com/wxy1343/aliyunpan/workflows/CI/badge.svg)](https://github.com/wxy1343/aliyunpan/actions)
 [![GitHub](https://img.shields.io/github/license/wxy1343/aliyunpan)](https://github.com/wxy1343/aliyunpan/blob/main/LICENSE)
-![PyPI](https://img.shields.io/pypi/v/aliyunpan)
+[![PyPI](https://img.shields.io/pypi/v/aliyunpan)](https://pypi.org/project/aliyunpan/)
+[![GitHub all releases](https://img.shields.io/github/downloads/wxy1343/aliyunpan/total)](https://github.com/wxy1343/aliyunpan/releases/latest/)
+[![wiki](https://img.shields.io/badge/-wiki-ff69b4)](https://github.com/wxy1343/aliyunpan/wiki)
 
 ---
 

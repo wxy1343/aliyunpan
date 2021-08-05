@@ -108,10 +108,10 @@ class Commander:
             else:
                 print(i.name, end='\t')
 
-    def get_path_list(self, path):
+    def get_path_list(self, path='root') -> list[FileInfo]:
         return self._path_list.get_path_list(path, update=False)
 
-    def get_fid_list(self, file_id):
+    def get_fid_list(self, file_id='root') -> list[FileInfo]:
         return self._path_list.get_fid_list(file_id, update=False)
 
     def tree(self, path='root', stdout=sys.stdout):
