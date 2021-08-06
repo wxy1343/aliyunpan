@@ -1,5 +1,6 @@
 import io
 import os
+import platform
 import sys
 import time
 from abc import abstractmethod
@@ -108,9 +109,6 @@ class Flag:
 
 class OutPut(object):
     def __init__(self):
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-        sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
         self._stdout = sys.stdout
         self._stderr = sys.stderr
         self._stdin = sys.stdin
@@ -141,12 +139,16 @@ class OutPutSingleton(OutPut):
             return
         self._first_init = False
         super(OutPutSingleton, self).__init__()
+        self._stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        self._stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+        self._stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
         self._print = self._output_gen()
         self._print.__next__()
         self.print_line = False
 
-    # def __del__(self):
-    #     self._stdout.write('\n')
+    def __del__(self):
+        if platform.system() != 'Windows':
+            self._stdout.write('\n')
 
     output = property(lambda self: self._print,
                       lambda self, value: (self._lock.acquire(), setattr(self, '_', None),

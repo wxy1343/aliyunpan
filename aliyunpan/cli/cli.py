@@ -250,7 +250,7 @@ class Commander:
                         parent_file_id = self._path_list.get_path_fid(upload_path, update=False)
                         try:
                             result = self._disk.upload_file(
-                                parent_file_id=parent_file_id, path=path,
+                                parent_file_id=parent_file_id, path=str(path),
                                 upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
                         except KeyboardInterrupt:
                             self.__del__()
