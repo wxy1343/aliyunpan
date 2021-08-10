@@ -74,8 +74,11 @@ class PathList:
                             change_file_list.extend(list(path.iterdir()))
                     if file_info and file_info['data'] and path.is_file() == file_info['data'].type:
                         if path.is_file() and get_sha1(path).lower() != file_info['data'].content_hash.lower():
+                            if i == len(disk_path_list):
+                                change_file_list.append(path)
                             continue
-                        flag = True
+                        else:
+                            flag = True
                 if not flag and i == len(disk_path_list):
                     change_file_list.append(path)
         if not len(list(p.iterdir())):
