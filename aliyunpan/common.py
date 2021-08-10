@@ -234,6 +234,7 @@ class Printer(OutPut):
 
     def upload_info(self, path, status=None, refresh_line=False, rapid_upload=False, t=None, average_speed=None, *args,
                     **kwargs):
+        self._output = True
         t = self._time_info.format(t) if t else None
         average_speed = self.avg_info.format(*str_of_size(average_speed, tuple_=True)) if average_speed else None
         rapid_title = self._rapid_upload_title if rapid_upload else None
@@ -242,6 +243,7 @@ class Printer(OutPut):
         self.output = info
 
     def download_info(self, path, status=None, refresh_line=False, t=None, average_speed=None, aria2=False, *args):
+        self._output = True
         t = self._time_info.format(t) if t else None
         aria2 = self._aria2_title if aria2 else aria2
         average_speed = self.avg_info.format(*str_of_size(average_speed, tuple_=True)) if average_speed else None
@@ -250,22 +252,26 @@ class Printer(OutPut):
         self.output = info
 
     def mkdir_info(self, path, status=None, *args, **kwargs):
+        self._output = True
         info = self.get_info(status, path, self._mkdir_title, *args, **kwargs)
         info.color = self._mkdir_color or info.color
         self.output = info
 
     def move_info(self, path, target_path, status=None, *args, **kwargs):
+        self._output = True
         info = self.get_info(status, path, self._move_title, *args, target_path=target_path, **kwargs)
         info.color = self._move_color or info.color
         self.output = info
 
     def remove_info(self, path, status=None, *args, **kwargs):
+        self._output = True
         info = self.get_info(status, path, self._remove_title, *args, **kwargs)
         info.error = False
         info.color = self._remove_color or info.color
         self.output = info
 
     def rename_info(self, path, name, status=None, *args, **kwargs):
+        self._output = True
         info = self.get_info(status, path, self._rename_title, *args, target_path=name, **kwargs)
         info.color = self._rename_color or info.color
         self.output = info
@@ -284,6 +290,7 @@ class Printer(OutPut):
             self._print.print_line = True
 
     def print_info(self, info, error=False, refresh_line=False, *args, **kwargs):
+        self._output = True
         self.output = Info(info, error, refresh_line, *args, **kwargs)
 
 

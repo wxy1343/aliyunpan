@@ -548,8 +548,7 @@ class Commander:
             self._path_list.update_path_list(p, is_fid=False)
             file_id = self._path_list.get_path_fid(p, update=False)
         path_ = self._path_list._tree.to_dict(file_id, with_data=True)[str(relative_path)]
-        change_file_list = self.check_path_diff(path, path_['children'] if 'children' in path_ else [])
-        self._print.refresh_line()
+        change_file_list = self._path_list.check_path_diff(path, path_['children'] if 'children' in path_ else [])
         for path_ in change_file_list:
             relative_path = path.name / (path - path_)
             if path_.exists():
@@ -557,42 +556,10 @@ class Commander:
                             chunk_size=chunk_size, retry=retry)
             else:
                 self.rm(upload_path / relative_path)
-            self._print.print_line()
         if sync_time:
             self._print.wait_info('等待{time}秒后再次同步', t=sync_time, refresh_line=True)
             self._print.refresh_line()
             self.sync(path, upload_path, sync_time, time_out, chunk_size, retry, first=first)
-
-    def check_path_diff(self, local_path, disk_path_list):
-        p = Path(local_path)
-        change_file_list = []
-        for path in p.iterdir():
-            flag = False
-            for i, path_ in enumerate(disk_path_list, 1):
-                name, file_info = list(path_.items())[0]
-                if p / name not in p.iterdir():
-                    change_file_list.append(p / name)
-                if Path(path) == p / name:
-                    if Path(path).is_dir() and file_info['data'] and path.is_dir() != file_info['data'].type:
-                        if 'children' in file_info:
-                            children = file_info['children']
-                            change_file_list.extend(self.check_path_diff(p / name, children))
-                        elif list(path.iterdir()):
-                            change_file_list.extend(list(path.iterdir()))
-                    if file_info and file_info['data'] and path.is_file() == file_info['data'].type:
-                        if path.is_file() and get_sha1(path).lower() != file_info['data'].content_hash.lower():
-                            continue
-                        flag = True
-                if not flag and i == len(disk_path_list):
-                    change_file_list.append(path)
-        if not len(list(p.iterdir())):
-            for path_ in disk_path_list:
-                name, file_info = list(path_.items())[0]
-                change_file_list.append(p / name)
-        if not len(disk_path_list):
-            for path_ in p.iterdir():
-                change_file_list.append(path_)
-        return list(set(change_file_list))
 
     def share_link(self, path_list, file_id_list=None, expiration=None):
         t = '' if expiration is None else time.time() + expiration

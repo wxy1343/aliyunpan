@@ -6,6 +6,7 @@ from treelib import Tree
 from treelib.exceptions import NodeIDAbsentError
 
 from aliyunpan.api.type import FileInfo, ShareInfo
+from aliyunpan.api.utils import get_sha1
 from aliyunpan.common import GetFileListBar
 
 _all_ = ['PathList', 'parse_share_url', 'AliyunpanPath']
@@ -35,6 +36,10 @@ class PathList:
             if depth == max_depth:
                 get_file_list_bar.refresh_line()
             return False
+        old_file_list = self._tree.children(file_id)
+        for i in old_file_list:
+            if i.identifier not in [j['file_id'] for j in file_list]:
+                self._tree.remove_node(i.identifier)
         for i, info in enumerate(file_list):
             if depth == max_depth:
                 ratio = (i + 1) / len(file_list) if file_list else None
@@ -50,6 +55,37 @@ class PathList:
         if depth == max_depth:
             get_file_list_bar.refresh_line()
         return True
+
+    def check_path_diff(self, local_path, disk_path_list):
+        p = Path(local_path)
+        change_file_list = []
+        for path in p.iterdir():
+            flag = False
+            for i, path_ in enumerate(disk_path_list, 1):
+                name, file_info = list(path_.items())[0]
+                if p / name not in p.iterdir():
+                    change_file_list.append(p / name)
+                if Path(path) == p / name:
+                    if Path(path).is_dir() and file_info['data'] and path.is_dir() != file_info['data'].type:
+                        if 'children' in file_info:
+                            children = file_info['children']
+                            change_file_list.extend(self.check_path_diff(p / name, children))
+                        elif list(path.iterdir()):
+                            change_file_list.extend(list(path.iterdir()))
+                    if file_info and file_info['data'] and path.is_file() == file_info['data'].type:
+                        if path.is_file() and get_sha1(path).lower() != file_info['data'].content_hash.lower():
+                            continue
+                        flag = True
+                if not flag and i == len(disk_path_list):
+                    change_file_list.append(path)
+        if not len(list(p.iterdir())):
+            for path_ in disk_path_list:
+                name, file_info = list(path_.items())[0]
+                change_file_list.append(p / name)
+        if not len(disk_path_list):
+            for path_ in p.iterdir():
+                change_file_list.append(path_)
+        return list(set(change_file_list))
 
     @staticmethod
     def get_file_info(info):
