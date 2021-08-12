@@ -1,5 +1,6 @@
 import json
 import sys
+from threading import RLock
 
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -27,6 +28,7 @@ class Req:
             return
         self._first_init = False
         self._disk = disk
+        self._lock = RLock()
         self._retry_num = 3
         self._session = requests.Session()
         self._timeout = 5
@@ -64,13 +66,17 @@ class Req:
             try:
                 logger.debug(r.status_code)
                 if depth:
-                    if self._disk and not stream and json.loads(r.text)['code'] == AliyunpanCode.token_invalid:
+                    self._lock.acquire()
+                    if self._disk and not stream and json.loads(r.text)['code'] == AliyunpanCode.token_invalid \
+                            or self._disk.refresh_token_expires_sec < 600:
                         depth -= 1
                         try:
                             self._disk.access_token = self._disk.get_access_token()
                         except InvalidRefreshToken:
                             self._disk.login()
+                        self._lock.release()
                         return self._req(method, depth=depth, *args, **kwargs)
+                    self._lock.release()
                 else:
                     raise InvalidAccessToken
             except (KeyboardInterrupt, InvalidAccessToken, LoginFailed):
@@ -81,6 +87,11 @@ class Req:
                 pass
             except:
                 logger.debug(sys.exc_info())
+            finally:
+                try:
+                    self._lock.release()
+                except RuntimeError:
+                    pass
             return r
         except requests.exceptions.RequestException:
             raise

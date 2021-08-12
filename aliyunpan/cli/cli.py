@@ -38,6 +38,7 @@ class Commander:
 
     def __del__(self):
         self._task_config.write(GLOBAL_VAR.tasks)
+        self._config.update('refresh_token', self._disk.refresh_token)
 
     def init(self, config_file=None, refresh_token=None, username=None, password=None, depth=3, timeout=None,
              drive_id=None, album=False):
@@ -95,7 +96,7 @@ class Commander:
         )
         return self._aria2
 
-    def ls(self, path, l, query=None):
+    def ls(self, path='root', l=False, query=None):
         if query:
             file_info_list = self._path_list.get_file_info(self._disk.search(query))
         else:

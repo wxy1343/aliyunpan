@@ -18,7 +18,7 @@ class Config:
                            lambda self, value: setattr(self, '_config_file', Path(value)))
 
     def read(self):
-        if not self._config_file.is_file():
+        if not self._config_file or not self._config_file.is_file():
             return {}
         with self.config_file.open(encoding='utf-8') as f:
             return yaml.load(f) or {}
@@ -30,7 +30,7 @@ class Config:
             except FileNotFoundError:
                 pass
             return
-        if not self._config_file.is_file():
+        if not self._config_file or not self._config_file.is_file():
             if not self._config_file.parent.is_dir():
                 self._config_file.parent.mkdir(parents=True)
             self._config_file.touch()
@@ -41,6 +41,8 @@ class Config:
         return True
 
     def get(self, key):
+        if not self._config_file:
+            return False
         conf = self.read()
         try:
             if key in conf.keys():
@@ -51,6 +53,8 @@ class Config:
         return None
 
     def update(self, key, value):
+        if not self._config_file:
+            return False
         conf = self.read() or {}
         if isinstance(value, DATA):
             value = dict(value)
@@ -65,6 +69,8 @@ class Config:
         return conf
 
     def delete(self, key):
+        if not self._config_file:
+            return False
         conf = self.read() or {}
         if conf and key in conf:
             conf.pop(key)

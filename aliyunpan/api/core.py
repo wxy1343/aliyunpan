@@ -31,6 +31,7 @@ class AliyunPan(object):
         self._username = None
         self._password = None
         self._refresh_token = refresh_token
+        self._refresh_token_expires = None
         self._access_token_gen_ = self._access_token_gen()
         self._drive_id_gen_ = self._drive_id_gen()
         self._chunk_size = 524288
@@ -513,21 +514,31 @@ class AliyunPan(object):
             i['upload_url'] = ''
         return part_info_list
 
+    def token_refresh(self):
+        # url = 'https://websv.aliyundrive.com/token/refresh'
+        # json = {"refresh_token": self.refresh_token}
+        url = 'https://auth.aliyundrive.com/v2/account/token'
+        json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
+        logger.info(f'Token has been refreshed.')
+        r = self._req.post(url, json=json, access_token=False)
+        try:
+            self._refresh_token = r.json()['refresh_token']
+            self._refresh_token_expires = time.time() + r.json()['expires_in']
+        except KeyError:
+            raise InvalidRefreshToken
+        return r.json()
+
+    @property
+    def refresh_token_expires_sec(self):
+        return self._refresh_token_expires - time.time()
+
     def get_access_token(self) -> str:
         """
         获取access_token
         :return:
         """
-        # url = 'https://websv.aliyundrive.com/token/refresh'
-        # json = {"refresh_token": self.refresh_token}
-        url = 'https://auth.aliyundrive.com/v2/account/token'
-        json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
-        logger.info(f'Get ACCESS_TOKEN.')
-        r = self._req.post(url, json=json, access_token=False)
-        try:
-            access_token = r.json()['access_token']
-        except KeyError:
-            raise InvalidRefreshToken
+        token_refresh_data = self.token_refresh()
+        access_token = token_refresh_data['access_token']
         GLOBAL_VAR.refresh_token = self.refresh_token
         GLOBAL_VAR.access_token = access_token
         logger.debug(access_token)
