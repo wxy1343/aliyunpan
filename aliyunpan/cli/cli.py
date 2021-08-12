@@ -38,7 +38,8 @@ class Commander:
 
     def __del__(self):
         self._task_config.write(GLOBAL_VAR.tasks)
-        self._config.update('refresh_token', self._disk.refresh_token)
+        if self._disk.refresh_token:
+            self._config.update('refresh_token', self._disk.refresh_token)
 
     def init(self, config_file=None, refresh_token=None, username=None, password=None, depth=3, timeout=None,
              drive_id=None, album=False):
@@ -571,6 +572,13 @@ class Commander:
             print(self._disk.share_link(file_id_list, t))
         else:
             raise FileNotFoundError
+
+    def auto_refresh_token(self, refresh_time):
+        print('Start to refresh token automatically.')
+        while True:
+            time.sleep(refresh_time)
+            self._disk.token_refresh()
+            print(time.strftime("%Y-%m-%d %H:%M:%S: ", time.localtime()) + self.disk.refresh_token)
 
     @property
     def req(self):

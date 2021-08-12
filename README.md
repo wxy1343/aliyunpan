@@ -70,21 +70,22 @@ EOF
 
 ## 功能介绍
 
-|指令                 |描述                           |
-|--------------------|------------------------------|
-|download (d)        |下载文件/文件夹                  |
-|ls (dir,l,list)     |列目录                         |
-|mv (move)           |移动文件/文件夹                  |
-|rm (del,delete)     |删除文件/文件夹                  |
-|rename (r)          |重命名文件/文件夹                |
-|tree (show,t)       |查看文件树                      |
-|upload (u)          |上传文件/文件夹                  |
-|share (s)           |分享文件                        |
-|mkdir (m)           |创建文件夹                      |
-|cat (c)             |显示文件内容                    |
-|tui                 |文本用户界面                    |
-|search              |搜索文件/文件夹                 |
-|sync                |同步文件夹                     |
+|指令                    |描述                           |
+|-----------------------|------------------------------|
+|download (d)           |下载文件/文件夹                  |
+|ls (dir,l,list)        |列目录                         |
+|mv (move)              |移动文件/文件夹                  |
+|rm (del,delete)        |删除文件/文件夹                  |
+|rename (r)             |重命名文件/文件夹                |
+|tree (show,t)          |查看文件树                      |
+|upload (u)             |上传文件/文件夹                  |
+|share (s)              |分享文件                        |
+|mkdir (m)              |创建文件夹                      |
+|cat (c)                |显示文件内容                    |
+|tui                    |文本用户界面                    |
+|search                 |搜索文件/文件夹                 |
+|sync                   |同步文件夹                     |
+|token (r,refresh_token)|查看refresh_token             |
 
 ## 使用指南
 
@@ -265,6 +266,16 @@ python main.py COMMAND -h
                 <td>sync</td>
                 <td>--sync-time</td>
                 <td>同步间隔时间</td>
+            </tr>        
+            <tr>
+                <td>token</td>
+                <td>--refresh, -r</td>
+                <td>刷新配置文件token</td>
+            </tr>        
+            <tr>
+                <td>token</td>
+                <td>--refresh-time, -t</td>
+                <td>自动刷新token间隔时间(秒)</td>
             </tr>
         </tbody>
     </table>

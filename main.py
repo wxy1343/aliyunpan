@@ -25,8 +25,9 @@ def cli(config_file, refresh_token, username, password, depth, debug, timeout, d
     logger.info(f'Version:{__version__}')
     if debug:
         logger.setLevel('DEBUG')
-    commander.init(config_file=config_file, refresh_token=refresh_token, username=username, password=password,
-                   depth=depth, timeout=timeout, drive_id=drive_id, album=album)
+    commander.init(config_file=None if refresh_token or username else config_file,
+                   refresh_token=None if username else refresh_token, username=username, password=password, depth=depth,
+                   timeout=timeout, drive_id=drive_id, album=album)
 
 
 @cli.command(aliases=['l', 'list', 'dir'], help='List files.')
@@ -172,6 +173,18 @@ def sync(path, upload_path, time_out, chunk_size, retry, sync_time):
 @click.help_option('-h', '--help')
 def tui():
     commander.tui()
+
+
+@cli.command(aliases=['r', 'refresh_token'], help='Get refresh_token.')
+@click.help_option('-h', '--help')
+@click.option('--refresh', '-r', is_flag=True, help='Refresh the token of the configuration file.')
+@click.option('--refresh-time', '-t', type=click.FLOAT, help='Auto refresh token interval time(sec).')
+def token(refresh, refresh_time):
+    if refresh:
+        commander.disk.token_refresh()
+    elif refresh_time:
+        commander.auto_refresh_token(refresh_time)
+    click.echo(commander.disk.refresh_token)
 
 
 commander: Commander
