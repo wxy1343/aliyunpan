@@ -8,6 +8,7 @@ from threading import Thread
 import npyscreen
 import pyperclip
 
+from aliyunpan.api.type import FileInfo
 from aliyunpan.api.utils import logger, stop_thread, get_open_port
 
 __all__ = ['AliyunpanTUI']
@@ -347,7 +348,8 @@ class FileGrid(npyscreen.SimpleGrid):
                 else:
                     Thread(target=functools.partial(self.parent.parentApp._cli.download_file,
                                                     path=Path(self.file_info.name),
-                                                    url=self.file_info.download_url)).start()
+                                                    url=self.parent.parentApp._cli._disk.get_download_url(
+                                                        self.file_info.id))).start()
             else:
                 if self.parent.name == 'root':
                     path = Path(self.file_info.name)
@@ -476,13 +478,31 @@ class FileGrid(npyscreen.SimpleGrid):
 class Search(npyscreen.ActionPopup):
     def create(self):
         self.query = self.add(npyscreen.TitleText, name='query')
+        self.limit_num = self.add(npyscreen.TitleText, name='limit num', value='100')
+        self.limit = self.add(npyscreen.Checkbox, name='limit', value=False)
+        self.raw = self.add(npyscreen.Checkbox, name='raw')
+        self.category_list = []
+        self.category = self.add(npyscreen.TitleMultiSelect, name='category', scroll_exit=True,
+                                 value_changed_callback=lambda widget: setattr(self, 'category_list',
+                                                                               [self.category.values[i] for i in
+                                                                                widget.value]))
+        self.category.values = ['video', 'audio', 'doc', 'zip', 'others']
 
     def afterEditing(self):
         self.parentApp.setNextFormPrevious()
 
     def on_ok(self):
+        if not self.query.value:
+            self.raw.value = True
         file_info_list = self.parentApp._cli._path_list.get_file_info(
-            self.parentApp._cli._disk.search(self.query.value))
+            self.parentApp._cli._disk.search(self.query.value, raw=self.raw.value, limit_num=int(self.limit_num.value),
+                                             limit=self.limit.value, category_list=self.category_list))
+        name = f'{time.time()} - {self.query.value}'
+        self.parentApp._cli._path_list._tree.create_node(tag=name, identifier=name, parent='root',
+                                                         data=FileInfo(name, name, 'root', False, time.time(),
+                                                                       time.time()))
+        for i in file_info_list:
+            self.parentApp._cli._path_list._tree.create_node(tag=i.name, identifier=i.id, parent=name, data=i)
         if not self.parentApp.file_grid.searched:
             self.parentApp.file_grid.searched = True
             self.parentApp.file_grid._parent_file_info = self.parentApp.file_grid.file_info
@@ -491,7 +511,7 @@ class Search(npyscreen.ActionPopup):
         for file_info in file_info_list:
             file_list.append(file_info.name)
         self.parentApp.file_grid.set_grid_values_from_flat_list(file_list)
-        self.parentApp.file_grid.parent.name = f'{self.query.value}'
+        self.parentApp.file_grid.parent.name = name
         self.parentApp.file_grid._display()
 
     def on_cancel(self):

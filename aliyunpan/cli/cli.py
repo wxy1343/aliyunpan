@@ -379,7 +379,7 @@ class Commander:
                         pass
                 for file_id, path in file_list:
                     if aria2:
-                        kwargs.update({'dir': str((save_path / path).parent.absolute())})
+                        kwargs.update({'dir': str((save_path / path).parent.absolute()), 'out': path.name})
                         self._aria2.add_uris([self._disk.get_download_url(file_id)], Options(self._aria2, kwargs))
                     else:
                         self.download_file(save_path / path, self._disk.get_download_url(file_id), chunk_size)
@@ -411,7 +411,7 @@ class Commander:
                 if single_file:
                     p = save_path / p.name
                 if aria2:
-                    kwargs.update({'dir': str(p.parent.absolute())})
+                    kwargs.update({'dir': str(p.parent.absolute()), 'out': p.name})
                     self._aria2.add_uris([self._disk.get_download_url(file_node.id)], Options(self._aria2, kwargs))
                     self._print.download_info(p, status=True, aria2=True)
                 else:

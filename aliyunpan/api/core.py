@@ -631,27 +631,41 @@ class AliyunPan(object):
             print(r.json()["message"])
         return False
 
-    def search(self, query: str, raw=False, next_marker: str = None):
+    def search(self, query: str, raw=False, next_marker: str = None, limit_num: int = 100, limit: bool = False,
+               category_list=None):
         """
         搜索文件
         :param query
         :param raw
         :param next_marker
+        :param limit_num
+        :param limit
+        :param category_list
         """
         url = 'https://api.aliyundrive.com/v2/file/search'
         if not raw:
             query = f'name match \"{query}\"'
+        if category_list:
+            for i in category_list:
+                if query:
+                    query += ' and '
+                query += f'category = \"{i}\"'
         json = {
             'drive_id': self.drive_id,
             'query': query,
-            'order_by': 'updated_at DESC'
+            'order_by': 'updated_at DESC',
+            'limit': limit_num
         }
+        if next_marker:
+            json['marker'] = next_marker
         r = self._req.post(url, json=json)
         if 'items' not in r.json():
             return []
         file_list = r.json()['items']
-        if 'next_marker' in r.json() and r.json()['next_marker'] and next_marker != r.json()['next_marker']:
-            file_list.extend(self.search(query, raw=raw, next_marker=r.json()['next_marker']))
+        if 'next_marker' in r.json() and r.json()['next_marker'] and \
+                next_marker != r.json()['next_marker'] and not limit:
+            file_list.extend(
+                self.search(query, raw=True, next_marker=r.json()['next_marker'], limit_num=limit_num))
         return file_list
 
     def get_play_info(self, file_id, expire_sec=14400, category=None):
