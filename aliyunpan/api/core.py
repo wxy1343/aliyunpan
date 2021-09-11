@@ -231,6 +231,8 @@ class AliyunPan(object):
             j.update(json)
         # 申请创建文件
         url = 'https://api.aliyundrive.com/v2/file/create'
+        if 'proof_code' in j:
+            url = 'https://api.aliyundrive.com/adrive/v2/file/createWithFolders'
         logger.info(f'Create file {file_name} in file {parent_file_id}.')
         retry_num = 3
         while retry_num:
@@ -514,11 +516,11 @@ class AliyunPan(object):
             i['upload_url'] = ''
         return part_info_list
 
-    def token_refresh(self):
+    def token_refresh(self, refresh_token: str = None):
         # url = 'https://websv.aliyundrive.com/token/refresh'
         # json = {"refresh_token": self.refresh_token}
         url = 'https://auth.aliyundrive.com/v2/account/token'
-        json = {"refresh_token": self.refresh_token, 'grant_type': 'refresh_token'}
+        json = {"refresh_token": refresh_token or self.refresh_token, 'grant_type': 'refresh_token'}
         logger.info(f'Token has been refreshed.')
         r = self._req.post(url, json=json, access_token=False)
         try:
@@ -609,20 +611,22 @@ class AliyunPan(object):
         logger.debug(f'file_id:{file_id},expire_sec:{expire_sec},url:{url}')
         return url
 
-    def save_share_link(self, name: str, content_hash: str, content_hash_name: str, size: str,
+    def save_share_link(self, name: str, content_hash: str, proof_code: str, content_hash_name: str, size: str,
                         parent_file_id: str = 'root', force: bool = False) -> bool:
         """
         保存分享文件
         :param content_hash_name:
         :param name:
         :param content_hash:
+        :param proof_code:
         :param size:
         :param parent_file_id:
         :param force:
         :return:
         """
-        logger.info(f'name: {name}, content_hash:{content_hash}, size:{size}')
-        json = {'content_hash': content_hash, 'size': int(size), 'content_hash_name': content_hash_name or 'sha1'}
+        logger.info(f'name: {name}, content_hash:{content_hash}, proof_code:{proof_code}, size:{size}')
+        json = {'content_hash': content_hash, 'proof_code': proof_code, 'proof_version': 'v1', 'size': int(size),
+                'content_hash_name': content_hash_name or 'sha1'}
         r = self.create_file(name, parent_file_id=parent_file_id, file_type=True, json=json, force=force)
         if r.status_code == 201 and 'rapid_upload' in r.json() and r.json()['rapid_upload']:
             return r.json()['file_id']
@@ -708,3 +712,8 @@ class AliyunPan(object):
             else:
                 return ''
         return r.json()['share_url']
+
+    def get_share_by_anonymous(self, share_id: str):
+        url = f'https://api.aliyundrive.com/adrive/v3/share_link/get_share_by_anonymous'
+        r = self._req.post(url, json={'share_id': share_id})
+        return r.json()['file_infos']

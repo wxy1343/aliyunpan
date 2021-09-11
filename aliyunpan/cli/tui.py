@@ -486,7 +486,7 @@ class Search(npyscreen.ActionPopup):
                                  value_changed_callback=lambda widget: setattr(self, 'category_list',
                                                                                [self.category.values[i] for i in
                                                                                 widget.value]))
-        self.category.values = ['video', 'audio', 'doc', 'zip', 'others']
+        self.category.values = ['video', 'audio', 'image', 'doc', 'zip', 'others']
 
     def afterEditing(self):
         self.parentApp.setNextFormPrevious()

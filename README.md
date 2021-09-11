@@ -18,7 +18,27 @@
 pip install aliyunpan
 ```
 
+## 更新
+
+```shell
+pip install aliyunpan --upgrade
+```
+
+## 运行
+
+```shell
+aliyunpan-cli
+```
+
+## pyinstaller打包
+
+[最新版下载](https://github.com/wxy1343/aliyunpan/releases/latest) (GitHub
+Actions打包，glibc版本较高 [#42](https://github.com/wxy1343/aliyunpan/issues/42))  
+[第三方下载](https://media.cooluc.com/source/aliyunDrive-cli) (更新较慢)
+
 ## 克隆项目
+
+* `--recurse-submodules` 用于克隆子模块，部分功能需要(可选)
 
 ```shell
 git clone https://github.com/wxy1343/aliyunpan --recurse-submodules
@@ -39,6 +59,7 @@ git clone https://github.com/wxy1343/aliyunpan --recurse-submodules
 
 * ~~登录api加入了ua检测，需要运行混淆的js代码来获取ua~~
 * ~~推荐安装 [node.js](https://nodejs.org) 和 [jsdom](https://github.com/jsdom/jsdom) 模块来运行js代码~~
+* 目前阿里云盘修改了ua的算法,加入了鼠标移动之类的信息,如果有解决方法的欢迎来[pr](https://github.com/wxy1343/aliyunpan/pulls)
 
 ```shell
 npm install jsdom
@@ -276,6 +297,11 @@ python main.py COMMAND -h
                 <td>token</td>
                 <td>--refresh-time, -t</td>
                 <td>自动刷新token间隔时间(秒)</td>
+            </tr>        
+            <tr>
+                <td>change</td>
+                <td>--change, -c</td>
+                <td>设置新的refresh_token</td>
             </tr>
         </tbody>
     </table>
@@ -299,16 +325,23 @@ python main.py COMMAND -h
 
 ### 分享
 
+* 由于官方修改秒传接口导致该功能失效
+* 暂时采用在秒传链接中加入直链的方法用以获取proof_code
+* 分享秒传文件时需要通过直链获取文件随机8字节，导致速度较慢
+* 由于直链的局限，秒传链接有效期为4小时
+
 1.分享链接格式
 
 ```
-aliyunpan://文件名|sha1|文件大小|相对路径
+aliyunpan://文件名|sha1|url_base64|文件大小|相对路径
 ```
 
 例如
 
+* 以下秒传链接均已失效，仅供参考
+
 ```
-aliyunpan://示例文件.txt|F61851825609372B3D7F802E600B35A497CFC38E|24|root
+aliyunpan://示例文件.txt|F61851825609372B3D7F802E600B35A497CFC38E|url_base64|24|root
 ```
 
 2.文件分享
@@ -320,7 +353,7 @@ python main.py share 示例文件.txt
 导入
 
 ```shell
-python main.py upload "aliyunpan://示例文件.txt|F61851825609372B3D7F802E600B35A497CFC38E|24|root"
+python main.py upload "aliyunpan://示例文件.txt|F61851825609372B3D7F802E600B35A497CFC38E|url_base64|24|root"
 ```
 
 3.文件夹分享
@@ -332,7 +365,7 @@ python main.py share 示例文件夹
 导入
 
 ```shell
-python main.py upload -s "aliyunpan://示例文件夹|80E7E25109D4246653B600FDFEDD8D8B0D97E517|970|root"
+python main.py upload -s "aliyunpan://示例文件夹|80E7E25109D4246653B600FDFEDD8D8B0D97E517|url_base64|970|root"
 ```
 
 ### TUI按键指南

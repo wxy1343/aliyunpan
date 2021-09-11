@@ -179,11 +179,15 @@ def tui():
 @click.help_option('-h', '--help')
 @click.option('--refresh', '-r', is_flag=True, help='Refresh the token of the configuration file.')
 @click.option('--refresh-time', '-t', type=click.FLOAT, help='Auto refresh token interval time(sec).')
-def token(refresh, refresh_time):
+@click.option('--change', '-c', type=click.STRING, help='Set new refresh_token.')
+def token(refresh, refresh_time, change):
     if refresh:
         commander.disk.token_refresh()
     elif refresh_time:
         commander.auto_refresh_token(refresh_time)
+    elif change:
+        if commander.disk.token_refresh(change):
+            commander.disk.refresh_token = change
     click.echo(commander.disk.refresh_token)
 
 

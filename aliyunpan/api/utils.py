@@ -9,10 +9,11 @@ import socket
 import sys
 from pathlib import Path
 
+import requests
 import rsa
 
 __all__ = ['ROOT_DIR', 'logger', 'log_file', 'get_sha1', 'str_of_size', 'Iter', 'encrypt', 'parse_biz_ext',
-           'stop_thread', 'get_open_port', 'get_real_path']
+           'stop_thread', 'get_open_port', 'get_real_path', 'get_proof_code', 'get_url_byte', 'get_file_byte']
 
 ROOT_DIR = str(Path(os.environ.get('ALIYUNPAN_ROOT')).resolve().absolute()) if os.environ.get(
     'ALIYUNPAN_ROOT') else os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -53,6 +54,33 @@ def get_sha1(path, split_size=524288):
     hash_bar.hash_info(path, status=True, size=file_size, refresh_line=True)
     hash_bar.print_line()
     return content_hash
+
+
+def get_proof_code(bys: bytes) -> str:
+    proof_code = base64.b64encode(bys).decode()
+    return proof_code
+
+
+def get_file_byte(path: Path, access_token: str = None):
+    n1 = int(hashlib.md5(access_token.encode()).hexdigest()[:16], 16)
+    n2 = path.stat().st_size
+    n3 = n1 % n2
+    with path.open('rb') as f:
+        f.seek(n3)
+        return f.read(min(n3 + 8, n2) - n3)
+
+
+def get_url_byte(url: str, access_token: str = None, file_size: int = None):
+    from aliyunpan.api.req import Req
+    req = Req()
+    if not file_size:
+        file_size = int(req.get(url, stream=True).headers.get('Content-Length'))
+    n1 = int(hashlib.md5(access_token.encode()).hexdigest()[:16], 16)
+    n2 = file_size
+    n3 = (n1 % n2) if n2 else 0
+    headers = {'Range': f'bytes={n3}-{min(n3 + 8, n2) - 1}'}
+    r: requests.Response = req.get(url, headers=headers, stream=True)
+    return r.content
 
 
 def str_of_size(size, decimal=3, tuple_=False):

@@ -1,3 +1,4 @@
+import base64
 import sys
 import time
 from pathlib import Path, PurePosixPath
@@ -6,7 +7,7 @@ from treelib import Tree
 from treelib.exceptions import NodeIDAbsentError
 
 from aliyunpan.api.type import FileInfo, ShareInfo
-from aliyunpan.api.utils import get_sha1
+from aliyunpan.api.utils import get_sha1, get_url_byte, get_proof_code
 from aliyunpan.common import GetFileListBar
 
 _all_ = ['PathList', 'parse_share_url', 'AliyunpanPath']
@@ -189,16 +190,18 @@ class PathList:
             return self.update_path_list()
 
 
-def parse_share_url(url):
-    name, content_hash, size, path = url.split('aliyunpan://')[1].split('|')[:4]
+def parse_share_url(url, access_token):
+    name, content_hash, url, size, path = url.split('aliyunpan://')[1].split('|')[:5]
+    url = base64.b64decode(url).decode()
     split_list = [':', '=']
     content_hash_name = ''
     for i in split_list:
         if i in content_hash:
             content_hash_name, content_hash = content_hash.split(i)
             break
-    share_info = ShareInfo(name=name, content_hash=content_hash, content_hash_name=content_hash_name, size=size,
-                           path=Path(path.strip()))
+    proof_code = get_proof_code(get_url_byte(url, access_token, int(size)))
+    share_info = ShareInfo(name=name, content_hash=content_hash, proof_code=proof_code,
+                           content_hash_name=content_hash_name, size=size, path=Path(path.strip()))
     return share_info
 
 

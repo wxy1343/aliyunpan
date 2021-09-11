@@ -214,11 +214,11 @@ class Commander:
                 if self._share_link in str(path):
                     share_list = []
                     if share:
-                        share_info = parse_share_url(path)
+                        share_info = parse_share_url(path, self._disk.access_token)
                         file = self._path_list.get_path_node(share_info.name, update=False)
                         if file and not file.data.type:
                             path = path.replace(share_info.name, share_info.name + str(int(time.time())))
-                            share_info = parse_share_url(path)
+                            share_info = parse_share_url(path, self._disk.access_token)
                         if not self._path_list.get_path_fid(share_info.name, update=False):
                             self.upload_share(share_info)
                             self._path_list.update_path_list(depth=0)
@@ -228,14 +228,14 @@ class Commander:
                             path_ = share_info.path / share_info.name
                         for line in self.cat(path_).split('\n'):
                             if line.startswith(self._share_link):
-                                share_list.append(parse_share_url(line))
+                                share_list.append(parse_share_url(line, self._disk.access_token))
                         self.rm(path_)
                         if str(upload_path) == 'root':
                             upload_path = share_info.path
                         else:
                             upload_path /= share_info.path
                     else:
-                        share_list = parse_share_url(path)
+                        share_list = parse_share_url(path, self._disk.access_token)
                     return self.upload_share(share_list, upload_path, force)
                 path = Path(path)
                 if path.is_file():
@@ -247,7 +247,7 @@ class Commander:
                                 if not line:
                                     break
                                 if line.startswith(self._share_link):
-                                    share_list.append(parse_share_url(line))
+                                    share_list.append(parse_share_url(line, self._disk.access_token))
                         return self.upload_share(share_list, upload_path, force)
                     else:
                         parent_file_id = self._path_list.get_path_fid(upload_path, update=False)
@@ -318,7 +318,7 @@ class Commander:
                 upload_file_list.append([upload_path, file])
         return upload_file_list
 
-    def upload_share(self, share_info_list: ShareInfo, upload_path='root', force=False):
+    def upload_share(self, share_info_list: List[ShareInfo], upload_path='root', force=False):
         if not isinstance(share_info_list, list):
             share_info_list = [share_info_list]
         if upload_path == 'root':
@@ -341,12 +341,13 @@ class Commander:
                     folder_list.append((file_id, upload_path / path))
         folder_list = list(set(folder_list))
         for share_info in share_info_list:
+            share_info: ShareInfo
             path = share_info.path
             if str(upload_path) in ('', '.') and str(path) == 'root':
                 path = Path()
             parent_file_id = self._path_list.get_path_fid(upload_path / path)
-            result = self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.content_hash_name,
-                                                share_info.size, parent_file_id, force)
+            result = self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.proof_code,
+                                                share_info.content_hash_name, share_info.size, parent_file_id, force)
             p = AliyunpanPath(upload_path / path / share_info.name)
             file_list.append((result, p))
             self._print.print_line()
@@ -490,13 +491,14 @@ class Commander:
                 file = self._path_list._tree.get_node(file_id).data
             if file.type:
                 share_txt = file.name.center(50, '-') + '\n'
+                url = self._disk.get_download_url(file.id, expire_sec, file.category)
                 if download_link:
                     share_txt += '下载链接'.center(50, '*') + '\n'
-                    url = self._disk.get_download_url(file.id, expire_sec, file.category)
                     share_txt += url + '\n\n'
                 if share_link:
                     share_txt += '分享链接'.center(50, '*') + '\n'
-                    url = f'{self._share_link}{file.name}|{file.content_hash}|{file.size}|{parent_file or "root"}'
+                    url = base64.b64encode(url.encode()).decode()
+                    url = f'{self._share_link}{file.name}|{file.content_hash}|{url}|{file.size}|{parent_file or "root"}'
                     share_txt += url + '\n'
                     share_txt += '导入链接'.center(50, '*') + '\n'
                     share_txt += f'python main.py upload "{url}"' + '\n\n'
