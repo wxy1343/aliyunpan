@@ -230,9 +230,9 @@ class AliyunPan(object):
         if json:
             j.update(json)
         # 申请创建文件
-        url = 'https://api.aliyundrive.com/v2/file/create'
-        if 'proof_code' in j:
-            url = 'https://api.aliyundrive.com/adrive/v2/file/createWithFolders'
+        # url = 'https://api.aliyundrive.com/v2/file/create'
+        # if 'proof_code' in j:
+        url = 'https://api.aliyundrive.com/adrive/v2/file/createWithFolders'
         logger.info(f'Create file {file_name} in file {parent_file_id}.')
         retry_num = 3
         while retry_num:
@@ -282,7 +282,9 @@ class AliyunPan(object):
                 self._chunk_size = int(file_size / 1000)
                 continue
             break
-        json = {"size": file_size, "part_info_list": part_info_list, "content_hash": content_hash}
+        proof_code = get_proof_code(get_file_byte(path, self.access_token))
+        json = {"size": file_size, "part_info_list": part_info_list, "content_hash": content_hash,
+                'proof_code': proof_code, 'proof_version': 'v1'}
         path_list = []
         existed = False
         # 已存在任务

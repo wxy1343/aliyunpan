@@ -497,8 +497,8 @@ class Commander:
                     share_txt += url + '\n\n'
                 if share_link:
                     share_txt += '分享链接'.center(50, '*') + '\n'
-                    url = base64.b64encode(url.encode()).decode()
-                    url = f'{self._share_link}{file.name}|{file.content_hash}|{url}|{file.size}|{parent_file or "root"}'
+                    url_base64 = base64.b64encode(url.encode()).decode()
+                    url = f'{self._share_link}{file.name}|{file.content_hash}|{url_base64}|{file.size}|{parent_file or "root"}'
                     share_txt += url + '\n'
                     share_txt += '导入链接'.center(50, '*') + '\n'
                     share_txt += f'python main.py upload "{url}"' + '\n\n'
@@ -526,7 +526,8 @@ class Commander:
             if file_id:
                 self._path_list.update_path_list(depth=0)
                 file = self._path_list._tree.get_node(file_id).data
-                url = f'{self._share_link}{Path(path).name}|{file.content_hash}|{file.size}|root'
+                url_base64 = base64.b64encode(self.disk.get_download_url(file_id).encode()).decode()
+                url = f'{self._share_link}{Path(path).name}|{file.content_hash}|{url_base64}|{file.size}|root'
                 print(f'python main.py upload -s "{url}"')
 
     def tui(self):
