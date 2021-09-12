@@ -64,7 +64,7 @@ def get_proof_code(bys: bytes) -> str:
 def get_file_byte(path: Path, access_token: str = None):
     n1 = int(hashlib.md5(access_token.encode()).hexdigest()[:16], 16)
     n2 = path.stat().st_size
-    n3 = n1 % n2
+    n3 = (n1 % n2) if n2 else 0
     with path.open('rb') as f:
         f.seek(n3)
         return f.read(min(n3 + 8, n2) - n3)
