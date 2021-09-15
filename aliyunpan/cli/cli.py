@@ -39,7 +39,10 @@ class Commander:
     def __del__(self):
         self._task_config.write(GLOBAL_VAR.tasks)
         if self._disk.refresh_token:
-            self._config.update('refresh_token', self._disk.refresh_token)
+            try:
+                self._config.update('refresh_token', self._disk.refresh_token)
+            except AttributeError:
+                pass
 
     def init(self, config_file=None, refresh_token=None, username=None, password=None, depth=3, timeout=None,
              drive_id=None, album=False):
