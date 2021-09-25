@@ -1,4 +1,5 @@
 import os
+import platform
 from typing import List
 
 import aria2p
@@ -105,14 +106,18 @@ class Commander:
             file_info_list = self._path_list.get_file_info(self._disk.search(query))
         else:
             file_info_list = self._path_list.get_path_list(path, update=False)
-        for i in file_info_list:
+        for i, j in enumerate(file_info_list):
             if l:
-                if i.type:
-                    print(str_of_size(i.size), time.strftime('%d %b %H:%M', i.ctime), i.id, i.name)
+                if j.type:
+                    print(str_of_size(j.size), time.strftime('%d %b %H:%M', j.ctime), j.id, j.name, end='')
                 else:
-                    print('-', time.strftime('%d %b %H:%M', i.ctime), i.id, i.name)
+                    print('-', time.strftime('%d %b %H:%M', j.ctime), j.id, j.name, end='')
+                if i + 1 < len(file_info_list):
+                    print()
             else:
-                print(i.name, end='\t')
+                print(j.name, end='\t')
+        if platform.system() != 'Windows':
+            print()
 
     def get_path_list(self, path='root') -> List[FileInfo]:
         return self._path_list.get_path_list(path, update=False)

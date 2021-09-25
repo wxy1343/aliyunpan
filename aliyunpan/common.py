@@ -1,6 +1,5 @@
 import io
 import os
-import platform
 import sys
 import time
 from abc import abstractmethod
@@ -147,8 +146,7 @@ class OutPutSingleton(OutPut):
         self.print_line = False
 
     def __del__(self):
-        if platform.system() != 'Windows':
-            self._stdout.write('\n')
+        pass
 
     output = property(lambda self: self._print,
                       lambda self, value: (self._lock.acquire(), setattr(self, '_', None),

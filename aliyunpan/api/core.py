@@ -6,8 +6,9 @@ from pathlib import Path
 from threading import RLock
 
 import requests
+import simplejson
 
-from aliyunpan.api import ua
+# from aliyunpan.api import ua
 from aliyunpan.api.req import *
 from aliyunpan.api.type import UserInfo, AlibumInfo
 from aliyunpan.api.utils import *
@@ -46,12 +47,13 @@ class AliyunPan(object):
                         lambda self, value: setattr(self, '_drive_id', value))
     album = property(lambda self: self._album, lambda self, value: setattr(self, '_album', value))
 
-    def login(self, username: str = None, password: str = None):
+    def login(self, username: str = None, password: str = None, ua: str = None):
         """
         登录api
         https://github.com/zhjc1124/aliyundrive
         :param username:
         :param password:
+        :param ua:
         :return:
         """
         if username:
@@ -72,7 +74,7 @@ class AliyunPan(object):
                 'loginId': username,
                 'password2': password2,
                 'appName': 'aliyun_drive',
-                'ua': ua.get_ua()
+                'ua': ua
             }
         }
         logger.info('Logging in.')
@@ -95,7 +97,7 @@ class AliyunPan(object):
             pass
         raise LoginFailed
 
-    def get_file_list(self, parent_file_id: str = 'root', next_marker: str = None) -> list:
+    def get_file_list(self, parent_file_id: str = 'root', next_marker: str = None, retry=3) -> list:
         """
         获取文件列表
         :param parent_file_id:
@@ -106,7 +108,13 @@ class AliyunPan(object):
         json = {"drive_id": self.drive_id, "parent_file_id": parent_file_id, 'fields': '*', 'marker': next_marker}
         logger.info(f'Get the list of parent_file_id {parent_file_id}.')
         r = self._req.post(url, json=json)
-        logger.debug(r.json())
+        try:
+            logger.debug(r.json())
+        except simplejson.errors.JSONDecodeError:
+            if retry:
+                return self.get_file_list(parent_file_id=parent_file_id, next_marker=next_marker, retry=retry - 1)
+            else:
+                raise
         if 'items' not in r.json():
             return []
         file_list = r.json()['items']

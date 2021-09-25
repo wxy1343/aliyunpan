@@ -3,6 +3,7 @@ import sys
 from threading import RLock
 
 import requests
+import simplejson
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 from aliyunpan.api.utils import logger
@@ -81,7 +82,7 @@ class Req:
                     raise InvalidAccessToken
             except (KeyboardInterrupt, InvalidAccessToken, LoginFailed):
                 raise
-            except json.decoder.JSONDecodeError:
+            except (json.decoder.JSONDecodeError, simplejson.errors.JSONDecodeError):
                 logger.debug(r.text)
             except KeyError:
                 pass
