@@ -164,6 +164,14 @@ python main.py -h
                 <td>-a, --album</td>
                 <td>是否访问相册</td>
             </tr>
+            <tr>
+                <td>-s, --share-id</td>
+                <td>指定分享id</td>
+            </tr>
+            <tr>
+                <td>-sp, --share-pwd</td>
+                <td>指定分享密码</td>
+            </tr>
         </tbody>
     </table>
 </details>

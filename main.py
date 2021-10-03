@@ -20,14 +20,16 @@ from aliyunpan.cli.cli import Commander
 @click.option('-D', '--debug', is_flag=True, help='Debug mode.')
 @click.option('-T', '--timeout', type=click.FLOAT, help='Api request timeout.')
 @click.option('-id', '--drive-id', type=click.STRING, help='Specify DRIVE_ID.')
-@click.option('-a', '--album', is_flag=True, help='Specify album')
-def cli(config_file, refresh_token, username, password, depth, debug, timeout, drive_id, album):
+@click.option('-a', '--album', is_flag=True, help='Specify album.')
+@click.option('-s', '--share-id', type=click.STRING, help='Specify share_id.')
+@click.option('-sp', '--share-pwd', type=click.STRING, help='Specify share_pwd.')
+def cli(config_file, refresh_token, username, password, depth, debug, timeout, drive_id, album, share_id, share_pwd):
     logger.info(f'Version:{__version__}')
     if debug:
         logger.setLevel('DEBUG')
     commander.init(config_file=None if refresh_token or username else config_file,
                    refresh_token=None if username else refresh_token, username=username, password=password, depth=depth,
-                   timeout=timeout, drive_id=drive_id, album=album)
+                   timeout=timeout, drive_id=drive_id, album=album, share_id=share_id, share_pwd=share_pwd)
 
 
 @cli.command(aliases=['l', 'list', 'dir'], help='List files.')

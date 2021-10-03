@@ -427,7 +427,11 @@ class FileGrid(npyscreen.SimpleGrid):
             # 保存当前目录信息
             self._parent_file_info = None
             if file_id != 'root':
-                self._parent_file_info = self.parent.parentApp._cli._path_list._tree.get_node(file_id).data
+                file_node = self.parent.parentApp._cli._path_list._tree.get_node(file_id)
+                if file_node:
+                    self._parent_file_info = file_node.data
+                else:
+                    self._file_list = self.parent.parentApp._cli._path_list.get_fid_list('root', update=False)
         else:
             self._file_list = self.parent.parentApp._cli._path_list.get_fid_list(self._parent_file_info.id,
                                                                                  update=False)
@@ -447,7 +451,10 @@ class FileGrid(npyscreen.SimpleGrid):
         pid = self._parent_file_info.pid if self._parent_file_info else None
         while True:
             if pid:
-                file_info = self.parent.parentApp._cli._path_list._tree.get_node(pid).data
+                file_node = self.parent.parentApp._cli._path_list._tree.get_node(pid)
+                if not file_node:
+                    file_node = self.parent.parentApp._cli._path_list._tree.get_node('root')
+                file_info = file_node.data
                 if file_info:
                     path = file_info.name / path
                     pid = file_info.pid

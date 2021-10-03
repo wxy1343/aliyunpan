@@ -101,12 +101,13 @@ class PathList:
         for info in info_list:
             if info['type'] == 'file':
                 file_info = FileInfo(name=info['name'], id=info['file_id'], pid=info['parent_file_id'], type=True,
-                                     ctime=time.strptime(info['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                                     ctime=time.strptime(info['created_at'],
+                                                         '%Y-%m-%dT%H:%M:%S.%fZ') if 'created_at' in info else time.localtime(),
                                      update_time=time.strptime(info['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
-                                     hidden=info['hidden'], category=info['category'],
-                                     content_type=info['content_type'],
-                                     size=info['size'], content_hash_name=info['content_hash_name'],
-                                     content_hash=info['content_hash'],
+                                     hidden=info.get('hidden'), category=info['category'],
+                                     content_type=info.get('content_type'),
+                                     size=info['size'], content_hash_name=info.get('content_hash_name'),
+                                     content_hash=info.get('content_hash'),
                                      download_url=info['download_url'] if 'download_url' in info else '',
                                      video_media_metadata=info[
                                          'video_media_metadata'] if 'video_media_metadata' in info else None,
@@ -114,9 +115,10 @@ class PathList:
                                          'video_preview_metadata'] if 'video_preview_metadata' in info else None)
             else:
                 file_info = FileInfo(name=info['name'], id=info['file_id'], pid=info['parent_file_id'], type=False,
-                                     ctime=time.strptime(info['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                                     ctime=time.strptime(info['created_at'],
+                                                         '%Y-%m-%dT%H:%M:%S.%fZ') if 'created_at' in info else time.time(),
                                      update_time=time.strptime(info['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
-                                     hidden=info['hidden'])
+                                     hidden=info.get('hidden'))
             file_info_list.append(file_info)
         return file_info_list
 

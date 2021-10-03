@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-__all__ = ['FileInfo', 'UserInfo', 'ShareInfo', 'AlibumInfo']
+__all__ = ['FileInfo', 'UserInfo', 'ShareInfo', 'AlibumInfo', 'Share']
 
 _file_info = (
     'name', 'id', 'pid', 'type', 'ctime', 'update_time', 'hidden', 'category', 'content_type', 'size',
@@ -15,3 +15,14 @@ ShareInfo = namedtuple('ShareInfo', ['name', 'content_hash', 'proof_code', 'cont
 ShareInfo.__new__.__defaults__ = ('',) * 6
 AlibumInfo = namedtuple('AlibumInfo', ['drive_name', 'drive_id'])
 AlibumInfo.__new__.__defaults__ = ('',) * 2
+
+
+class Share:
+    share_id = ''
+    share_pwd = ''
+    share_token = ''
+
+    def __init__(self, share_id='', share_pwd='', share_token=''):
+        self.share_id = share_id
+        self.share_pwd = share_pwd
+        self.share_token = share_token

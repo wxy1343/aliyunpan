@@ -4,13 +4,14 @@ from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 from threading import RLock
+from typing import List
 
 import requests
 import simplejson
 
 # from aliyunpan.api import ua
 from aliyunpan.api.req import *
-from aliyunpan.api.type import UserInfo, AlibumInfo
+from aliyunpan.api.type import UserInfo, AlibumInfo, Share
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, \
@@ -22,11 +23,12 @@ __all__ = ['AliyunPan']
 
 class AliyunPan(object):
 
-    def __init__(self, refresh_token: str = None, album: bool = False):
+    def __init__(self, refresh_token: str = None, album: bool = False, share: Share = Share()):
         self._req = Req(self)
         self._user_info = None
         self._alibum_info = None
         self._album = album
+        self._share = share
         self._access_token = None
         self._drive_id = None
         self._username = None
@@ -46,6 +48,7 @@ class AliyunPan(object):
     drive_id = property(lambda self: (self._lock.acquire(), next(self._drive_id_gen_), self._lock.release())[1],
                         lambda self, value: setattr(self, '_drive_id', value))
     album = property(lambda self: self._album, lambda self, value: setattr(self, '_album', value))
+    share = property(lambda self: self._share)
 
     def login(self, username: str = None, password: str = None, ua: str = None):
         """
@@ -104,10 +107,21 @@ class AliyunPan(object):
         :param next_marker:
         :return:
         """
-        url = 'https://api.aliyundrive.com/v2/file/list'
-        json = {"drive_id": self.drive_id, "parent_file_id": parent_file_id, 'fields': '*', 'marker': next_marker}
+        json = {"parent_file_id": parent_file_id}
+        if next_marker:
+            json['marker'] = next_marker
+        headers = {}
+        kwargs = {}
+        if self._share.share_id:
+            url = 'https://api.aliyundrive.com/adrive/v3/file/list'
+            json.update({'share_id': self._share.share_id, 'share_pwd': self._share.share_pwd})
+            headers = {'x-share-token': self.get_share_token()}
+            kwargs = {'access_token': None}
+        else:
+            url = 'https://api.aliyundrive.com/v2/file/list'
+            json.update({"drive_id": self.drive_id, 'fields': '*'})
         logger.info(f'Get the list of parent_file_id {parent_file_id}.')
-        r = self._req.post(url, json=json)
+        r = self._req.post(url, json=json, headers=headers, **kwargs)
         try:
             logger.debug(r.json())
         except simplejson.errors.JSONDecodeError:
@@ -140,21 +154,43 @@ class AliyunPan(object):
             return r.json()['responses'][0]['id']
         return False
 
-    def move_file(self, file_id: str, parent_file_id: str):
+    def batch(self, file_id_list: list, parent_file_id: str, force: bool = False) -> requests.models.Response:
+        """
+        移动文件
+        """
+        file_json_list = []
+        auto_rename = False if force else True
+        headers = {}
+        for file_id in file_id_list:
+            body = {'file_id': file_id, 'to_parent_file_id': parent_file_id, 'auto_rename': auto_rename}
+            file_json = {'body': body,
+                         'headers': {'Content-Type': 'application/json'}, 'id': 0, 'method': 'POST',
+                         'url': '/file/move'}
+            file_json_list.append(file_json)
+        if self._share.share_id:
+            url = 'https://api.aliyundrive.com/adrive/v2/batch'
+            for i, file_json in enumerate(file_json_list):
+                file_json_list[i]['body']['to_drive_id'] = self.drive_id
+                file_json_list[i]['body']['share_id'] = self._share.share_id
+                file_json_list[i]['url'] = '/file/copy'
+            headers['x-share-token'] = self.get_share_token()
+        else:
+            url = 'https://api.aliyundrive.com/v2/batch'
+            for i, file_json in enumerate(file_json_list):
+                file_json_list[i]['id'] = file_json['body']['file_id']
+                file_json_list[i]['body']['drive_id'] = self.drive_id
+        json = {'requests': file_json_list, 'resource': "file"}
+        return self._req.post(url, json=json, headers=headers)
+
+    def move_file(self, file_id: List[str], parent_file_id: str):
         """
         移动文件
         :param file_id:
         :param parent_file_id:
         :return:
         """
-        url = 'https://api.aliyundrive.com/v2/batch'
-        json = {"requests": [{"body": {"drive_id": self.drive_id, "file_id": file_id,
-                                       "to_parent_file_id": parent_file_id},
-                              "headers": {"Content-Type": "application/json"},
-                              "id": file_id, "method": "POST", "url": "/file/move"}],
-                "resource": "file"}
         logger.info(f'Move files {file_id} to {parent_file_id}')
-        r = self._req.post(url, json=json)
+        r = self.batch([file_id], parent_file_id)
         if r.status_code == 200:
             if 'message' in r.json()['responses'][0]['body']:
                 print(r.json()['responses'][0]['body']['message'])
@@ -724,6 +760,24 @@ class AliyunPan(object):
         return r.json()['share_url']
 
     def get_share_by_anonymous(self, share_id: str):
+        """
+        获取分享文件列表
+        """
         url = f'https://api.aliyundrive.com/adrive/v3/share_link/get_share_by_anonymous'
         r = self._req.post(url, json={'share_id': share_id})
         return r.json()['file_infos']
+
+    def get_share_token(self, share: Share = None):
+        """
+        获取share_token
+        """
+        if not share:
+            share = self._share
+        if share.share_token:
+            return share.share_token
+        url = 'https://api.aliyundrive.com/v2/share_link/get_share_token'
+        json = {'share_id': share.share_id, 'share_pwd': share.share_pwd}
+        r = self._req.post(url, json=json)
+        share_token = r.json().get('share_token', '')
+        share.share_token = share_token
+        return share_token

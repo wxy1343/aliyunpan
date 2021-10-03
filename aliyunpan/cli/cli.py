@@ -9,6 +9,7 @@ from aria2p import Options
 from aliyunpan.api.core import AliyunPan
 from aliyunpan.api.models import *
 from aliyunpan.api.req import *
+from aliyunpan.api.type import Share
 from aliyunpan.api.utils import *
 from aliyunpan.cli.config import Config
 from aliyunpan.cli.tui import AliyunpanTUI
@@ -23,7 +24,7 @@ class Commander:
     def __init__(self, init=True, *args, **kwargs):
         self._disk = AliyunPan()
         self._path_list = PathList(self._disk)
-        self._req = Req()
+        self._req = Req(self._disk)
         self._config = Config()
         self._task_config = Config(ROOT_DIR / Path('tasks.yaml'))
         self._share_link = 'aliyunpan://'
@@ -46,11 +47,12 @@ class Commander:
                 pass
 
     def init(self, config_file=None, refresh_token=None, username=None, password=None, depth=3, timeout=None,
-             drive_id=None, album=False):
+             drive_id=None, album=False, share_id='', share_pwd=''):
         self._path_list.depth = depth
         self._req.timeout = timeout
         self._disk.drive_id = drive_id
         self._disk.album = album
+        self._disk._share = Share(share_id, share_pwd)
         config_file_list = list(
             filter(lambda x: get_real_path(x).is_file(), map(lambda x: get_real_path(x), self._config_set)))
         if config_file:
