@@ -213,7 +213,7 @@ class Commander:
         return file_id_list
 
     def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False, share=False, chunk_size=None,
-               c=False):
+               c=False, ignore=False):
         if isinstance(path, (str, AliyunpanPath, Path)):
             path_list = (path,)
         else:
@@ -264,7 +264,8 @@ class Commander:
                         try:
                             result = self._disk.upload_file(
                                 parent_file_id=parent_file_id, path=str(path),
-                                upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
+                                upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c,
+                                ignore=ignore)
                         except KeyboardInterrupt:
                             self.__del__()
                             raise
@@ -287,7 +288,8 @@ class Commander:
                             parent_file_id = self._path_list.get_path_fid(file[0], update=False)
                             result = self._disk.upload_file(
                                 parent_file_id=parent_file_id, path=file[1],
-                                upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c)
+                                upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c,
+                                ignore=ignore)
                         except KeyboardInterrupt:
                             self.__del__()
                             raise
@@ -549,11 +551,10 @@ class Commander:
             self._print.print_info(
                 'Do you really want to synchronize the root? This operation may delete all your files.', error=True)
             input('\nEnter to continue.')
-        first = False
         path = AliyunpanPath(path)
         relative_path = AliyunpanPath(path.name)
         if str(relative_path) == '.':
-            return self.sync(path.absolute(), upload_path, sync_time, time_out, chunk_size, retry, first=first)
+            return self.sync(path.absolute(), upload_path, sync_time, time_out, chunk_size, retry, first=False)
         upload_path = AliyunpanPath(upload_path)
         p = upload_path / relative_path
         self._path_list.update_path_list(p, is_fid=False)
@@ -567,14 +568,17 @@ class Commander:
         for path_ in change_file_list:
             relative_path = path.name / (path - path_)
             if path_.exists():
-                self.upload(path_, upload_path / relative_path.parent, force=True, timeout=time_out,
-                            chunk_size=chunk_size, retry=retry)
+                if not self.upload(path_, upload_path / relative_path.parent, force=True, timeout=time_out,
+                                   chunk_size=chunk_size, retry=retry, ignore=True):
+                    if first:
+                        self._print.upload_info(path_, status=False)
+                        self._print.print_line()
             else:
                 self.rm(upload_path / relative_path)
         if sync_time:
             self._print.wait_info('等待{time}秒后再次同步', t=sync_time, refresh_line=True)
             self._print.refresh_line()
-            self.sync(path, upload_path, sync_time, time_out, chunk_size, retry, first=first)
+            self.sync(path, upload_path, sync_time, time_out, chunk_size, retry, first=False)
 
     def share_link(self, path_list, file_id_list=None, expiration=None):
         t = '' if expiration is None else time.time() + expiration

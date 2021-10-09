@@ -296,7 +296,8 @@ class AliyunPan(object):
         return r
 
     def upload_file(self, parent_file_id: str = 'root', path: str = None, upload_timeout: float = 10,
-                    retry_num: int = 3, force: bool = False, chunk_size: int = None, c: bool = False):
+                    retry_num: int = 3, force: bool = False, chunk_size: int = None, c: bool = False,
+                    ignore: bool = False):
         """
         上传文件
         :param parent_file_id: 上传目录的id
@@ -306,6 +307,7 @@ class AliyunPan(object):
         :param force: 强制覆盖
         :param chunk_size: 分块大小
         :param c: 断点续传
+        :param ignore: 忽略上传失败的文件
         :return:
         """
         path = Path(path)
@@ -313,7 +315,13 @@ class AliyunPan(object):
         file_name = path.name
         self._chunk_size = chunk_size or self._chunk_size
         # 获取sha1
-        content_hash = get_sha1(path, self._chunk_size)
+        try:
+            content_hash = get_sha1(path, self._chunk_size)
+        except PermissionError:
+            if not ignore:
+                self._print.upload_info(path, status=False)
+                self._print.print_line()
+            return False
         while True:
             # 分片列表
             part_info_list = []
@@ -497,9 +505,10 @@ class AliyunPan(object):
         try:
             file_info = self.complete(file_id, upload_id)
         except InvalidContentHash:
-            upload_bar.upload_info(path, status=False, refresh_line=True)
-            if get_real_path(log_file) != get_real_path(path):
-                raise
+            if not ignore:
+                upload_bar.upload_info(path, status=False, refresh_line=True)
+                if get_real_path(log_file) != get_real_path(path):
+                    raise
         if file_info:
             upload_bar.upload_info(path, status=True, t=upload_bar.time, average_speed=upload_bar.average_speed,
                                    refresh_line=True)
@@ -508,8 +517,9 @@ class AliyunPan(object):
             GLOBAL_VAR.file_set.add((content_hash, str(get_real_path(path))))
             return file_info
         else:
-            upload_bar.upload_info(path, status=False, refresh_line=True)
-            self._print.print_line()
+            if not ignore:
+                upload_bar.upload_info(path, status=False, refresh_line=True)
+                self._print.print_line()
             return False
 
     def complete(self, file_id, upload_id):
