@@ -13,7 +13,6 @@ from aliyunpan.api.req import *
 from aliyunpan.api.type import Share
 from aliyunpan.api.utils import *
 from aliyunpan.cli.config import Config
-from aliyunpan.cli.tui import AliyunpanTUI
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, InvalidPassword, InvalidConfiguration, \
     ConfigurationFileNotFoundError, AliyunpanCode
@@ -576,6 +575,7 @@ class Commander:
                 print(f'python main.py upload -s "{url}"')
 
     def tui(self):
+        from aliyunpan.cli.tui import AliyunpanTUI
         aliyunpan_tui = AliyunpanTUI(self)
         aliyunpan_tui.run()
 
