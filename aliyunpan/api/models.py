@@ -131,11 +131,14 @@ class PathList:
 
     def get_path_list(self, path, update=True):
         file_id = self.get_path_fid(path, update=update)
-        return self.get_fid_list(file_id, update=update)
+        try:
+            return self.get_fid_list(file_id, update=update)
+        except FileNotFoundError:
+            raise FileNotFoundError(path)
 
     def get_fid_list(self, file_id, update=True):
         if not file_id:
-            raise FileNotFoundError(Path)
+            raise FileNotFoundError
         try:
             self.auto_update_path_list(update, file_id)
         except NodeIDAbsentError:

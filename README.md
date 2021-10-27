@@ -172,6 +172,14 @@ python main.py -h
                 <td>-sp, --share-pwd</td>
                 <td>指定分享密码</td>
             </tr>
+            <tr>
+                <td>-f, --filter-file</td>
+                <td>过滤文件(多个)</td>
+            </tr>
+            <tr>
+                <td>-w, --whitelist</td>
+                <td>使用白名单过滤文件</td>
+            </tr>
         </tbody>
     </table>
 </details>
@@ -295,6 +303,11 @@ python main.py COMMAND -h
                 <td>sync</td>
                 <td>--sync-time</td>
                 <td>同步间隔时间</td>
+            </tr>        
+            <tr>
+                <td>sync</td>
+                <td>--no-delete, -n</td>
+                <td>不删除云盘文件</td>
             </tr>        
             <tr>
                 <td>token</td>

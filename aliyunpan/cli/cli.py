@@ -1,5 +1,6 @@
 import os
 import platform
+import re
 from typing import List
 
 import aria2p
@@ -22,6 +23,7 @@ __all__ = ['Commander']
 
 class Commander:
     def __init__(self, init=True, *args, **kwargs):
+        self.whitelist = False
         self._disk = AliyunPan()
         self._path_list = PathList(self._disk)
         self._req = Req(self._disk)
@@ -31,6 +33,7 @@ class Commander:
         self._print = Printer()
         self._host_url = 'https://www.aliyundrive.com/'
         self._aria2 = None
+        self.filter_set = set()
         self._config_set = {'~/.config/aliyunpan.yaml', '.config/aliyunpan.yaml', '~/aliyunpan.yaml', 'aliyunpan.yaml',
                             os.environ.get('ALIYUNPAN_CONF', '')}
         GLOBAL_VAR.tasks = self._task_config.read()
@@ -47,12 +50,14 @@ class Commander:
                 pass
 
     def init(self, config_file=None, refresh_token=None, username=None, password=None, depth=3, timeout=None,
-             drive_id=None, album=False, share_id='', share_pwd=''):
+             drive_id=None, album=False, share_id='', share_pwd='', filter_file=None, whitelist=False):
         self._path_list.depth = depth
         self._req.timeout = timeout
         self._disk.drive_id = drive_id
         self._disk.album = album
         self._disk._share = Share(share_id, share_pwd)
+        self.filter_set.update(filter_file)
+        self.whitelist = whitelist
         config_file_list = list(
             filter(lambda x: get_real_path(x).is_file(), map(lambda x: get_real_path(x), self._config_set)))
         if config_file:
@@ -131,20 +136,28 @@ class Commander:
         return self._path_list.tree(path, stdout)
 
     def rm(self, path, file_id=None):
+        if not self.file_filter(path):
+            return False
         if not file_id:
             file_id = self._path_list.get_path_fid(path, update=False)
         if file_id:
             file_id_ = self._disk.delete_file(file_id)
             if file_id_ == file_id:
                 file_id = file_id_
-                self._print.remove_info(path or file_id, status=False)
+                self._print.remove_info(path or file_id, status=True)
                 self._path_list._tree.remove_node(file_id)
                 self._print.print_line()
             else:
                 file_id = False
+                self._print.remove_info(path or file_id, status=False)
+                self._print.print_line()
+        else:
+            raise FileNotFoundError(path or file_id)
         return file_id
 
     def rename(self, path, name):
+        if not self.file_filter(path):
+            return False
         file_id = self._path_list.get_path_fid(path, update=False)
         status = False
         existed = False
@@ -164,6 +177,8 @@ class Commander:
 
     def mv(self, path, target_path):
         path = AliyunpanPath(path)
+        if not self.file_filter(path):
+            return False
         target_path = AliyunpanPath(target_path)
         file_id = self._path_list.get_path_fid(path, update=False)
         target_file_id = self._path_list.get_path_fid(target_path, update=False)
@@ -186,6 +201,8 @@ class Commander:
 
     def mkdir(self, path, name=None, parent_file_id=None):
         file_id_list = []
+        if not self.file_filter(path):
+            return False
         if not parent_file_id or not name:
             path = AliyunpanPath(path)
             name = path.name
@@ -212,109 +229,118 @@ class Commander:
             file_id_list.append((file_id, path))
         return file_id_list
 
+    def file_filter(self, path):
+        path = Path(path)
+        if not path:
+            return False
+        for pattern in self.filter_set:
+            if re.match(pattern, path.name):
+                return self.whitelist
+        return not self.whitelist
+
     def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False, share=False, chunk_size=None,
                c=False, ignore=False):
         if isinstance(path, (str, AliyunpanPath, Path)):
             path_list = (path,)
         else:
             path_list = path
+        path_list = filter(self.file_filter, path_list)
         result_list = []
         for path in path_list:
-            if path:
-                if self._share_link in str(path):
-                    share_list = []
-                    if share:
+            if self._share_link in str(path):
+                share_list = []
+                if share:
+                    share_info = parse_share_url(path, self._disk.access_token)
+                    file = self._path_list.get_path_node(share_info.name, update=False)
+                    if file and not file.data.type:
+                        path = path.replace(share_info.name, share_info.name + str(int(time.time())))
                         share_info = parse_share_url(path, self._disk.access_token)
-                        file = self._path_list.get_path_node(share_info.name, update=False)
-                        if file and not file.data.type:
-                            path = path.replace(share_info.name, share_info.name + str(int(time.time())))
-                            share_info = parse_share_url(path, self._disk.access_token)
-                        if not self._path_list.get_path_fid(share_info.name, update=False):
-                            self.upload_share(share_info)
-                            self._path_list.update_path_list(depth=0)
-                        if str(share_info.path) == 'root':
-                            path_ = share_info.name
-                        else:
-                            path_ = share_info.path / share_info.name
-                        for line in self.cat(path_).split('\n'):
+                    if not self._path_list.get_path_fid(share_info.name, update=False):
+                        self.upload_share(share_info)
+                        self._path_list.update_path_list(depth=0)
+                    if str(share_info.path) == 'root':
+                        path_ = share_info.name
+                    else:
+                        path_ = share_info.path / share_info.name
+                    for line in self.cat(path_).split('\n'):
+                        if line.startswith(self._share_link):
+                            share_list.append(parse_share_url(line, self._disk.access_token))
+                    self.rm(path_)
+                    if str(upload_path) == 'root':
+                        upload_path = share_info.path
+                    else:
+                        upload_path /= share_info.path
+                else:
+                    share_list = parse_share_url(path, self._disk.access_token)
+                return self.upload_share(share_list, upload_path, force)
+            path = Path(path)
+            if path.is_file():
+                if share:
+                    share_list = []
+                    with open(path, 'r', encoding='utf-8') as f:
+                        while True:
+                            line = f.readline()
+                            if not line:
+                                break
                             if line.startswith(self._share_link):
                                 share_list.append(parse_share_url(line, self._disk.access_token))
-                        self.rm(path_)
-                        if str(upload_path) == 'root':
-                            upload_path = share_info.path
-                        else:
-                            upload_path /= share_info.path
-                    else:
-                        share_list = parse_share_url(path, self._disk.access_token)
                     return self.upload_share(share_list, upload_path, force)
-                path = Path(path)
-                if path.is_file():
-                    if share:
-                        share_list = []
-                        with open(path, 'r', encoding='utf-8') as f:
-                            while True:
-                                line = f.readline()
-                                if not line:
-                                    break
-                                if line.startswith(self._share_link):
-                                    share_list.append(parse_share_url(line, self._disk.access_token))
-                        return self.upload_share(share_list, upload_path, force)
-                    else:
-                        parent_file_id = self._path_list.get_path_fid(upload_path, update=False)
-                        try:
-                            result = self._disk.upload_file(
-                                parent_file_id=parent_file_id, path=str(path),
-                                upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c,
-                                ignore=ignore)
-                        except KeyboardInterrupt:
-                            self.__del__()
-                            raise
-                        if result:
-                            if isinstance(result, str):
-                                file_id = result
-                            else:
-                                file_info = self._path_list.get_file_info(result)[0]
-                                file_id = file_info.id
-                                self._path_list._tree.create_node(tag=file_info.name, identifier=file_info.id,
-                                                                  parent=parent_file_id, data=file_info)
-                            result_list.append(file_id)
-                elif path.is_dir():
-                    if upload_path == 'root':
-                        upload_path = '/'
-                    upload_path = Path(upload_path)
-                    upload_file_list = self.upload_dir(path, upload_path)
-                    for file in upload_file_list:
-                        try:
-                            parent_file_id = self._path_list.get_path_fid(file[0], update=False)
-                            result = self._disk.upload_file(
-                                parent_file_id=parent_file_id, path=file[1],
-                                upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c,
-                                ignore=ignore)
-                        except KeyboardInterrupt:
-                            self.__del__()
-                            raise
-                        if result:
-                            if isinstance(result, str):
-                                file_id = result
-                            else:
-                                file_info = self._path_list.get_file_info(result)[0]
-                                file_id = file_info.id
-                                self._path_list._tree.create_node(tag=file_info.name, identifier=file_info.id,
-                                                                  parent=parent_file_id, data=file_info)
-                            result_list.append(file_id)
                 else:
-                    raise FileNotFoundError
-                for file_hash, path in GLOBAL_VAR.file_set:
-                    if file_hash in GLOBAL_VAR.tasks and GLOBAL_VAR.tasks[file_hash].upload_time:
-                        if isinstance(GLOBAL_VAR.tasks[file_hash].path, str):
-                            del GLOBAL_VAR.tasks[file_hash]
+                    parent_file_id = self._path_list.get_path_fid(upload_path, update=False)
+                    try:
+                        result = self._disk.upload_file(
+                            parent_file_id=parent_file_id, path=str(path),
+                            upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c,
+                            ignore=ignore)
+                    except KeyboardInterrupt:
+                        self.__del__()
+                        raise
+                    if result:
+                        if isinstance(result, str):
+                            file_id = result
                         else:
-                            try:
-                                GLOBAL_VAR.tasks[file_hash].path.remove(path)
-                            except ValueError:
-                                pass
-                            if not GLOBAL_VAR.tasks[file_hash].path:
-                                del GLOBAL_VAR.tasks[file_hash]
+                            file_info = self._path_list.get_file_info(result)[0]
+                            file_id = file_info.id
+                            self._path_list._tree.create_node(tag=file_info.name, identifier=file_info.id,
+                                                              parent=parent_file_id, data=file_info)
+                        result_list.append(file_id)
+            elif path.is_dir():
+                if upload_path == 'root':
+                    upload_path = '/'
+                upload_path = Path(upload_path)
+                upload_file_list = self.upload_dir(path, upload_path)
+                for file in upload_file_list:
+                    try:
+                        parent_file_id = self._path_list.get_path_fid(file[0], update=False)
+                        result = self._disk.upload_file(
+                            parent_file_id=parent_file_id, path=file[1],
+                            upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c,
+                            ignore=ignore)
+                    except KeyboardInterrupt:
+                        self.__del__()
+                        raise
+                    if result:
+                        if isinstance(result, str):
+                            file_id = result
+                        else:
+                            file_info = self._path_list.get_file_info(result)[0]
+                            file_id = file_info.id
+                            self._path_list._tree.create_node(tag=file_info.name, identifier=file_info.id,
+                                                              parent=parent_file_id, data=file_info)
+                        result_list.append(file_id)
+            else:
+                raise FileNotFoundError
+            for file_hash, path in GLOBAL_VAR.file_set:
+                if file_hash in GLOBAL_VAR.tasks and GLOBAL_VAR.tasks[file_hash].upload_time:
+                    if isinstance(GLOBAL_VAR.tasks[file_hash].path, str):
+                        del GLOBAL_VAR.tasks[file_hash]
+                    else:
+                        try:
+                            GLOBAL_VAR.tasks[file_hash].path.remove(path)
+                        except ValueError:
+                            pass
+                        if not GLOBAL_VAR.tasks[file_hash].path:
+                            del GLOBAL_VAR.tasks[file_hash]
         return result_list
 
     def upload_dir(self, path, upload_path):
@@ -370,6 +396,8 @@ class Commander:
         return folder_list, file_list
 
     def download(self, path, save_path=None, single_file=False, share=False, chunk_size=1048576, aria2=False, **kwargs):
+        if not self.file_filter(path):
+            return False
         if not save_path:
             save_path = Path().cwd()
         save_path = Path(save_path)
@@ -437,6 +465,8 @@ class Commander:
                               chunk_size=chunk_size, aria2=aria2, **kwargs)
 
     def download_file(self, path, url, chunk_size=1048576):
+        if not self.file_filter(path):
+            return False
         try:
             path.parent.mkdir(parents=True)
             self._print.print_line()
@@ -492,6 +522,9 @@ class Commander:
         return r.text
 
     def share(self, path, expire_sec, share_link, download_link, save):
+        if not self.file_filter(path):
+            return False
+
         def share_(path, file_id, parent_file=''):
             if path:
                 file_node = self._path_list.get_path_node(path, update=False)
@@ -546,7 +579,7 @@ class Commander:
         aliyunpan_tui = AliyunpanTUI(self)
         aliyunpan_tui.run()
 
-    def sync(self, path, upload_path, sync_time, time_out, chunk_size, retry, first=True):
+    def sync(self, path, upload_path, sync_time, time_out, chunk_size, retry, no_delete, first=True):
         if first and path == 'root':
             self._print.print_info(
                 'Do you really want to synchronize the root? This operation may delete all your files.', error=True)
@@ -554,7 +587,8 @@ class Commander:
         path = AliyunpanPath(path)
         relative_path = AliyunpanPath(path.name)
         if str(relative_path) == '.':
-            return self.sync(path.absolute(), upload_path, sync_time, time_out, chunk_size, retry, first=False)
+            return self.sync(path.absolute(), upload_path, sync_time, time_out, chunk_size, retry, no_delete,
+                             first=False)
         upload_path = AliyunpanPath(upload_path)
         p = upload_path / relative_path
         self._path_list.update_path_list(p, is_fid=False)
@@ -565,6 +599,7 @@ class Commander:
             file_id = self._path_list.get_path_fid(p, update=False)
         path_ = self._path_list._tree.to_dict(file_id, with_data=True)[str(relative_path)]
         change_file_list = self._path_list.check_path_diff(path, path_['children'] if 'children' in path_ else [])
+        change_file_list = filter(self.file_filter, change_file_list)
         for path_ in change_file_list:
             relative_path = path.name / (path - path_)
             if path_.exists():
@@ -573,17 +608,18 @@ class Commander:
                     if first:
                         self._print.upload_info(path_, status=False)
                         self._print.print_line()
-            else:
+            elif not no_delete:
                 self.rm(upload_path / relative_path)
         if sync_time:
             self._print.wait_info('等待{time}秒后再次同步', t=sync_time, refresh_line=True)
             self._print.refresh_line()
-            self.sync(path, upload_path, sync_time, time_out, chunk_size, retry, first=False)
+            self.sync(path, upload_path, sync_time, time_out, chunk_size, retry, no_delete=no_delete, first=False)
 
     def share_link(self, path_list, file_id_list=None, expiration=None):
+        path_list = filter(self.file_filter, path_list)
         t = '' if expiration is None else time.time() + expiration
         if not file_id_list:
-            file_id_list = [self._path_list.get_path_fid(path, update=False) for path in path_list if path]
+            file_id_list = [self._path_list.get_path_fid(path, update=False) for path in path_list]
         file_id_list = list(filter(None, file_id_list))
         if file_id_list:
             print(self._disk.share_link(file_id_list, t))

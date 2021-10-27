@@ -23,13 +23,17 @@ from aliyunpan.cli.cli import Commander
 @click.option('-a', '--album', is_flag=True, help='Specify album.')
 @click.option('-s', '--share-id', type=click.STRING, help='Specify share_id.')
 @click.option('-sp', '--share-pwd', type=click.STRING, help='Specify share_pwd.')
-def cli(config_file, refresh_token, username, password, depth, debug, timeout, drive_id, album, share_id, share_pwd):
+@click.option('-f', '--filter-file', multiple=True, type=click.STRING, help='Filter files.')
+@click.option('-w', '--whitelist', is_flag=True, help='Filter files using whitelist.')
+def cli(config_file, refresh_token, username, password, depth, debug, timeout, drive_id, album, share_id, share_pwd,
+        filter_file, whitelist):
     logger.info(f'Version:{__version__}')
     if debug:
         logger.setLevel('DEBUG')
     commander.init(config_file=None if refresh_token or username else config_file,
                    refresh_token=None if username else refresh_token, username=username, password=password, depth=depth,
-                   timeout=timeout, drive_id=drive_id, album=album, share_id=share_id, share_pwd=share_pwd)
+                   timeout=timeout, drive_id=drive_id, album=album, share_id=share_id, share_pwd=share_pwd,
+                   filter_file=set(filter_file), whitelist=whitelist)
 
 
 @cli.command(aliases=['l', 'list', 'dir'], help='List files.')
@@ -167,8 +171,9 @@ def cat(path, encoding):
 @click.option('-t', '--time-out', type=click.FLOAT, help='Chunk upload timeout(sec).', default=10.0, show_default=True)
 @click.option('-r', '--retry', type=click.INT, help='number of retries.', default=3, show_default=True)
 @click.option('--sync-time', type=click.FLOAT, help='Synchronization interval time(sec).')
-def sync(path, upload_path, time_out, chunk_size, retry, sync_time):
-    commander.sync(path, upload_path, sync_time, time_out, chunk_size, retry)
+@click.option('--no-delete', '-n', is_flag=True, help='Do not delete the cloud drive files.')
+def sync(path, upload_path, time_out, chunk_size, retry, sync_time, no_delete):
+    commander.sync(path, upload_path, sync_time, time_out, chunk_size, retry, no_delete)
 
 
 @cli.command(aliases=['tui'], help='Text-based User Interface.')
