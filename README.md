@@ -180,6 +180,10 @@ python main.py -h
                 <td>-w, --whitelist</td>
                 <td>使用白名单过滤文件</td>
             </tr>
+            <tr>
+                <td>-m, --match</td>
+                <td>指定使用正则匹配文件</td>
+            </tr>
         </tbody>
     </table>
 </details>
@@ -301,13 +305,18 @@ python main.py COMMAND -h
             </tr>        
             <tr>
                 <td>sync</td>
-                <td>--sync-time</td>
+                <td>-st, --sync-time</td>
                 <td>同步间隔时间</td>
             </tr>        
             <tr>
                 <td>sync</td>
                 <td>--no-delete, -n</td>
-                <td>不删除云盘文件</td>
+                <td>不删除云盘文件(默认)</td>
+            </tr>        
+            <tr>
+                <td>sync</td>
+                <td>-d, --delete</td>
+                <td>允许删除云盘文件</td>
             </tr>        
             <tr>
                 <td>token</td>

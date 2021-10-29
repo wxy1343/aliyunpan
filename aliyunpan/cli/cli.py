@@ -1,7 +1,8 @@
+import functools
 import os
 import platform
 import re
-from typing import List
+from typing import List, Union
 
 import aria2p
 import requests
@@ -22,6 +23,7 @@ __all__ = ['Commander']
 
 class Commander:
     def __init__(self, init=True, *args, **kwargs):
+        self.match = False
         self.whitelist = False
         self._disk = AliyunPan()
         self._path_list = PathList(self._disk)
@@ -49,7 +51,7 @@ class Commander:
                 pass
 
     def init(self, config_file=None, refresh_token=None, username=None, password=None, depth=3, timeout=None,
-             drive_id=None, album=False, share_id='', share_pwd='', filter_file=None, whitelist=False):
+             drive_id=None, album=False, share_id='', share_pwd='', filter_file=None, whitelist=False, match=False):
         self._path_list.depth = depth
         self._req.timeout = timeout
         self._disk.drive_id = drive_id
@@ -57,6 +59,7 @@ class Commander:
         self._disk._share = Share(share_id, share_pwd)
         self.filter_set.update(filter_file)
         self.whitelist = whitelist
+        self.match = match
         config_file_list = list(
             filter(lambda x: get_real_path(x).is_file(), map(lambda x: get_real_path(x), self._config_set)))
         if config_file:
@@ -112,6 +115,8 @@ class Commander:
             file_info_list = self._path_list.get_file_info(self._disk.search(query))
         else:
             file_info_list = self._path_list.get_path_list(path, update=False)
+        if self.filter_set:
+            file_info_list = [i for i in file_info_list if self.file_filter(i.name)]
         for i, j in enumerate(file_info_list):
             if l:
                 if j.type:
@@ -228,24 +233,37 @@ class Commander:
             file_id_list.append((file_id, path))
         return file_id_list
 
-    def file_filter(self, path):
-        path = Path(path)
+    def file_filter(self, path, whitelist=None):
         if not path:
             return False
+        if whitelist is None:
+            whitelist = self.whitelist
+        if isinstance(path, FileInfo):
+            name = path.name
+        else:
+            name = Path(path)
         for pattern in self.filter_set:
-            if re.match(pattern, path.name):
-                return self.whitelist
-        return not self.whitelist
+            if re.match(pattern, str(name)):
+                return whitelist
+        return not whitelist
 
     def upload(self, path, upload_path='root', timeout=10.0, retry=3, force=False, share=False, chunk_size=None,
                c=False, ignore=False):
         if isinstance(path, (str, AliyunpanPath, Path)):
-            path_list = (path,)
+            path_list = {path}
         else:
             path_list = path
-        path_list = filter(self.file_filter, path_list)
+        if self.match:
+            [self.filter_set.add(i) for i in path_list]
+            if self.whitelist:
+                path_list = set(filter(functools.partial(self.file_filter, whitelist=False), Path().iterdir()))
+            else:
+                path_list = set(filter(functools.partial(self.file_filter, whitelist=True), Path().iterdir()))
+        else:
+            path_list = filter(self.file_filter, path_list)
         result_list = []
         for path in path_list:
+            path: Union[str, AliyunpanPath, Path]
             if self._share_link in str(path):
                 share_list = []
                 if share:
@@ -308,6 +326,7 @@ class Commander:
                     upload_path = '/'
                 upload_path = Path(upload_path)
                 upload_file_list = self.upload_dir(path, upload_path)
+                upload_file_list = [i for i in upload_file_list if self.file_filter(i[1])]
                 for file in upload_file_list:
                     try:
                         parent_file_id = self._path_list.get_path_fid(file[0], update=False)
@@ -394,16 +413,17 @@ class Commander:
                 self._print.upload_info(p, status=False)
         return folder_list, file_list
 
-    def download(self, path, save_path=None, single_file=False, share=False, chunk_size=1048576, aria2=False, **kwargs):
-        if not self.file_filter(path):
-            return False
+    def download(self, path, save_path=None, single_file=False, share=False, chunk_size=1048576, aria2=False,
+                 first=True, **kwargs):
         if not save_path:
             save_path = Path().cwd()
         save_path = Path(save_path)
         if isinstance(path, str):
-            path_list = (path,)
+            path_list = {path}
         else:
             path_list = path
+        if not first:
+            path_list = [i for i in path_list if self.file_filter(i)]
         kwargs.setdefault('referer', self._host_url)
         for path in path_list:
             if str(path).startswith(self._share_link) or share:
@@ -461,7 +481,7 @@ class Commander:
                 self._print.print_line()
             else:
                 self.download(self._path_list.get_fid_list(file_node.id), save_path=save_path / p.name,
-                              chunk_size=chunk_size, aria2=aria2, **kwargs)
+                              chunk_size=chunk_size, aria2=aria2, first=False, **kwargs)
 
     def download_file(self, path, url, chunk_size=1048576):
         if not self.file_filter(path):
@@ -579,7 +599,7 @@ class Commander:
         aliyunpan_tui = AliyunpanTUI(self)
         aliyunpan_tui.run()
 
-    def sync(self, path, upload_path, sync_time, time_out, chunk_size, retry, no_delete, first=True):
+    def sync(self, path, upload_path, sync_time, time_out, chunk_size, retry, delete, first=True):
         if first and path == 'root':
             self._print.print_info(
                 'Do you really want to synchronize the root? This operation may delete all your files.', error=True)
@@ -587,7 +607,7 @@ class Commander:
         path = AliyunpanPath(path)
         relative_path = AliyunpanPath(path.name)
         if str(relative_path) == '.':
-            return self.sync(path.absolute(), upload_path, sync_time, time_out, chunk_size, retry, no_delete,
+            return self.sync(path.absolute(), upload_path, sync_time, time_out, chunk_size, retry, delete,
                              first=False)
         upload_path = AliyunpanPath(upload_path)
         p = upload_path / relative_path
@@ -608,12 +628,12 @@ class Commander:
                     if first:
                         self._print.upload_info(path_, status=False)
                         self._print.print_line()
-            elif not no_delete:
+            elif delete:
                 self.rm(upload_path / relative_path)
         if sync_time:
             self._print.wait_info('等待{time}秒后再次同步', t=sync_time, refresh_line=True)
             self._print.refresh_line()
-            self.sync(path, upload_path, sync_time, time_out, chunk_size, retry, no_delete=no_delete, first=False)
+            self.sync(path, upload_path, sync_time, time_out, chunk_size, retry, delete=delete, first=False)
 
     def share_link(self, path_list, file_id_list=None, expiration=None):
         path_list = filter(self.file_filter, path_list)
