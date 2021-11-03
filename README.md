@@ -311,12 +311,17 @@ python main.py COMMAND -h
             <tr>
                 <td>sync</td>
                 <td>--no-delete, -n</td>
-                <td>不删除云盘文件(默认)</td>
+                <td>不删除(云盘/本地)文件(默认)</td>
             </tr>        
             <tr>
                 <td>sync</td>
                 <td>-d, --delete</td>
-                <td>允许删除云盘文件</td>
+                <td>允许删除(云盘/本地)文件</td>
+            </tr>         
+            <tr>
+                <td>sync</td>
+                <td>-l, --local</td>
+                <td>同步云盘文件到本地</td>
             </tr>        
             <tr>
                 <td>token</td>

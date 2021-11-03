@@ -119,7 +119,10 @@ def download(ctx, path, file, save_path, share, chunk_size, aria2):
         file_list = {*file, path}
     kwargs = {}
     for i in ctx.args:
-        kwargs[i.split('=')[0]] = i.split('=')[1]
+        if '=' in i:
+            kwargs[i.split('=')[0]] = i.split('=')[1]
+        else:
+            kwargs[i] = True
     commander.download(file_list, save_path=save_path, share=share, chunk_size=chunk_size, aria2=aria2, **kwargs)
 
 
@@ -164,18 +167,30 @@ def cat(path, encoding):
     click.echo(commander.cat(path, encoding))
 
 
-@cli.command(aliases=['sync'], help='Synchronize files.')
+@cli.command(aliases=['sync'], help='Synchronize files.',
+             context_settings=dict(ignore_unknown_options=True, allow_extra_args=True))
 @click.help_option('-h', '--help')
-@click.argument('path', type=click.Path())
-@click.argument('upload_path', default='root')
+@click.argument('local_path', type=click.Path())
+@click.argument('remote_path', default='root')
 @click.option('-cs', '--chunk-size', type=click.INT, help='Chunk size(byte).')
 @click.option('-t', '--time-out', type=click.FLOAT, help='Chunk upload timeout(sec).', default=10.0, show_default=True)
 @click.option('-r', '--retry', type=click.INT, help='number of retries.', default=3, show_default=True)
 @click.option('-st', '--sync-time', type=click.FLOAT, help='Synchronization interval time(sec).')
-@click.option('-n', '--no-delete', is_flag=True, help='Do not delete the cloud drive files.')
-@click.option('-d', '--delete', is_flag=True, help='Allow deletion of cloud drive files.')
-def sync(path, upload_path, time_out, chunk_size, retry, sync_time, no_delete, delete):
-    commander.sync(path, upload_path, sync_time, time_out, chunk_size, retry, delete)
+@click.option('-n', '--no-delete', is_flag=True, help='Do not delete the cloud/local files.')
+@click.option('-d', '--delete', is_flag=True, help='Allow deletion of cloud/local files.')
+@click.option('-l', '--local', is_flag=True, help='Sync cloud drive files to local.')
+@click.pass_context
+def sync(ctx, local_path, remote_path, time_out, chunk_size, retry, sync_time, no_delete, delete, local):
+    kwargs = {}
+    for i in ctx.args:
+        if '=' in i:
+            kwargs[i.split('=')[0]] = i.split('=')[1]
+        else:
+            kwargs[i] = True
+    if local:
+        commander.sync_local(remote_path, local_path, sync_time, chunk_size, delete, **kwargs)
+    else:
+        commander.sync(local_path, remote_path, sync_time, time_out, chunk_size, retry, delete)
 
 
 @cli.command(aliases=['tui'], help='Text-based User Interface.')

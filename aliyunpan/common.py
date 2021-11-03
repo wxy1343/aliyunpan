@@ -144,6 +144,7 @@ class OutPutSingleton(OutPut):
         self._print = self._output_gen()
         self._print.__next__()
         self.print_line = False
+        self.count = 0
 
     def __del__(self):
         pass
@@ -157,7 +158,7 @@ class OutPutSingleton(OutPut):
         while True:
             info = yield
             with self._lock:
-                if self.print_line:
+                if self.print_line and self.count:
                     self._stdout.write('\n')
                     self.print_line = False
                 if last_info:
@@ -170,6 +171,7 @@ class OutPutSingleton(OutPut):
                     self._stdout.write(str(info))
                 self._stderr.flush()
                 self._stdout.flush()
+                self.count += 1
             last_info = info
 
 

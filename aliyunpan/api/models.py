@@ -243,3 +243,6 @@ class AliyunpanPath(type(Path())):
             else:
                 parts.append(j)
         return AliyunpanPath('/'.join(parts))
+
+    def __add__(self, other):
+        return Path(self.__str__()) / Path(str(other))

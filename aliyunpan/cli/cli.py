@@ -2,6 +2,7 @@ import functools
 import os
 import platform
 import re
+import shutil
 from typing import List, Union
 
 import aria2p
@@ -57,7 +58,7 @@ class Commander:
         self._disk.drive_id = drive_id
         self._disk.album = album
         self._disk._share = Share(share_id, share_pwd)
-        self.filter_set.update(filter_file)
+        self.filter_set.update(filter_file) if filter_file else None
         self.whitelist = whitelist
         self.match = match
         config_file_list = list(
@@ -413,8 +414,10 @@ class Commander:
                 self._print.upload_info(p, status=False)
         return folder_list, file_list
 
-    def download(self, path, save_path=None, single_file=False, share=False, chunk_size=1048576, aria2=False,
+    def download(self, path, save_path=None, single_file=False, share=False, chunk_size=None, aria2=False,
                  first=True, **kwargs):
+        if not chunk_size:
+            chunk_size = 1048576
         if not save_path:
             save_path = Path().cwd()
         save_path = Path(save_path)
@@ -634,6 +637,34 @@ class Commander:
             self._print.wait_info('等待{time}秒后再次同步', t=sync_time, refresh_line=True)
             self._print.refresh_line()
             self.sync(path, upload_path, sync_time, time_out, chunk_size, retry, delete=delete, first=False)
+
+    def sync_local(self, sync_path, save_path, sync_time, chunk_size, delete, **kwargs):
+        if not save_path:
+            save_path = '.'
+        path = AliyunpanPath(save_path) + AliyunpanPath(sync_path)
+        if not path.exists():
+            self.download(sync_path, save_path)
+        file_id = self.path_list.get_path_fid(sync_path, update=False)
+        if not file_id:
+            raise FileNotFoundError(sync_path)
+        self._path_list.update_path_list(sync_path, is_fid=False)
+        path_ = self._path_list._tree.to_dict(file_id, with_data=True)[str(AliyunpanPath(sync_path))]
+        change_file_list = self._path_list.check_path_diff(path, path_['children'] if 'children' in path_ else [])
+        for path_ in change_file_list:
+            p = str(AliyunpanPath(path_) - AliyunpanPath(save_path))
+            file_node = self.path_list.get_path_node(p)
+            if not file_node:
+                if delete:
+                    Path(path_).unlink() if path_.is_file() else shutil.rmtree(path_)
+                    self._print.remove_info(path_, True)
+                    self._print.print_line()
+            else:
+                self.download(p, str(save_path / Path(p).parent), chunk_size=chunk_size, **kwargs)
+        if sync_time:
+            self._print.wait_info('等待{time}秒后再次同步', t=sync_time, refresh_line=True)
+            self._print.refresh_line()
+            return self.sync_local(sync_path, save_path, sync_time=sync_time, chunk_size=chunk_size, delete=delete,
+                                   **kwargs)
 
     def share_link(self, path_list, file_id_list=None, expiration=None):
         path_list = filter(self.file_filter, path_list)
