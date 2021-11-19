@@ -334,7 +334,7 @@ python main.py COMMAND -h
                 <td>自动刷新token间隔时间(秒)</td>
             </tr>        
             <tr>
-                <td>change</td>
+                <td>token</td>
                 <td>--change, -c</td>
                 <td>设置新的refresh_token</td>
             </tr>

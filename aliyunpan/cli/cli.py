@@ -305,6 +305,8 @@ class Commander:
                     return self.upload_share(share_list, upload_path, force)
                 else:
                     parent_file_id = self._path_list.get_path_fid(upload_path, update=False)
+                    if not parent_file_id:
+                        raise FileNotFoundError(upload_path)
                     try:
                         result = self._disk.upload_file(
                             parent_file_id=parent_file_id, path=str(path),
@@ -331,6 +333,8 @@ class Commander:
                 for file in upload_file_list:
                     try:
                         parent_file_id = self._path_list.get_path_fid(file[0], update=False)
+                        if not parent_file_id:
+                            raise FileNotFoundError(upload_path)
                         result = self._disk.upload_file(
                             parent_file_id=parent_file_id, path=file[1],
                             upload_timeout=timeout, retry_num=retry, force=force, chunk_size=chunk_size, c=c,

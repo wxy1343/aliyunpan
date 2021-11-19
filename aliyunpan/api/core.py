@@ -16,7 +16,7 @@ from aliyunpan.api.utils import *
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, \
     InvalidContentHash, UploadUrlExpired, UploadUrlFailedRefresh, PartNumberOverLimit, BadResponseCode, \
-    PartNotSequential, InvalidExpiration, FileShareNotAllowed
+    PartNotSequential, InvalidExpiration, FileShareNotAllowed, InvalidParentFileId
 
 __all__ = ['AliyunPan']
 
@@ -310,6 +310,8 @@ class AliyunPan(object):
         :param ignore: 忽略上传失败的文件
         :return:
         """
+        if not parent_file_id:
+            raise InvalidParentFileId
         path = Path(path)
         file_size = path.stat().st_size
         file_name = path.name

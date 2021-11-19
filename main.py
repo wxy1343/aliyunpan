@@ -122,7 +122,7 @@ def download(ctx, path, file, save_path, share, chunk_size, aria2):
         if '=' in i:
             kwargs[i.split('=')[0]] = i.split('=')[1]
         else:
-            kwargs[i] = True
+            kwargs[i.strip('-')] = True
     commander.download(file_list, save_path=save_path, share=share, chunk_size=chunk_size, aria2=aria2, **kwargs)
 
 
@@ -186,7 +186,7 @@ def sync(ctx, local_path, remote_path, time_out, chunk_size, retry, sync_time, n
         if '=' in i:
             kwargs[i.split('=')[0]] = i.split('=')[1]
         else:
-            kwargs[i] = True
+            kwargs[i.strip('-')] = True
     if local:
         commander.sync_local(remote_path, local_path, sync_time, chunk_size, delete, **kwargs)
     else:

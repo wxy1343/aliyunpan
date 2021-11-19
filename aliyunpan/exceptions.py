@@ -25,6 +25,13 @@ class InvalidAccessToken(InvalidToken):
         return self.message or 'Is not a valid access_token.'
 
 
+class InvalidParentFileId(AliyunpanException):
+    """无效的parent_file_id"""
+
+    def __str__(self):
+        return self.message or 'parent_file_id is not a valid value.'
+
+
 class InvalidPassword(AliyunpanException):
     """无效的密码"""
 
