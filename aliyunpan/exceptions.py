@@ -48,6 +48,10 @@ class ConfigurationFileNotFoundError(ConfigurationFileError):
     """找不到配置文件"""
 
 
+class CreateDirError(AliyunpanException):
+    """创建目录错误"""
+
+
 class InvalidConfiguration(ConfigurationFileError):
     """无效的配置文件"""
 

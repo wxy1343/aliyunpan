@@ -12,12 +12,12 @@ from aria2p import Options
 from aliyunpan.api.core import AliyunPan
 from aliyunpan.api.models import *
 from aliyunpan.api.req import *
-from aliyunpan.api.type import Share
+from aliyunpan.api.type import Share, File
 from aliyunpan.api.utils import *
 from aliyunpan.cli.config import Config
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, InvalidPassword, InvalidConfiguration, \
-    ConfigurationFileNotFoundError, AliyunpanCode
+    ConfigurationFileNotFoundError, AliyunpanCode, CreateDirError
 
 __all__ = ['Commander']
 
@@ -180,59 +180,103 @@ class Commander:
         self._print.rename_info(path, name=name, status=status, existed=existed)
         return file_id
 
-    def mv(self, path, target_path):
-        path = AliyunpanPath(path)
-        if not self.file_filter(path):
-            return False
+    def move_by_path_list(self, path_list, target_path) -> List[File]:
         target_path = AliyunpanPath(target_path)
-        file_id = self._path_list.get_path_fid(path, update=False)
-        target_file_id = self._path_list.get_path_fid(target_path, update=False)
-        target_file_node = self._path_list._tree.get_node(target_file_id)
-        if target_file_id and target_file_node:
-            if target_file_node.data.type:
-                raise FileExistsError
-            else:
-                _ = self._disk.move_file(file_id, target_file_id)
-                if _ and file_id:
-                    self._print.move_info(path, target_path, status=True)
-                    self._path_list._tree.remove_node(file_id)
-                    self._path_list.update_path_list(Path(target_path) / path, is_fid=False)
-                else:
-                    self._print.move_info(path, target_path, status=False)
+        parent_file_id = self._path_list.get_path_fid(target_path, update=False)
+        parent_file_node = self._path_list._tree.get_node(parent_file_id)
+        file_list = []
+        file_list_ = []
+        for path in path_list:
+            path = AliyunpanPath(path)
+            if not self.file_filter(path):
+                continue
+            if parent_file_id and parent_file_node:
+                if parent_file_node.data.type:
+                    raise FileExistsError(target_path)
+                if self._disk._share and path in ('', '/', '\\', '.', 'root', '..'):
+                    file_list.extend(self.move_share_file(path, target_path))
+                    continue
+                file_id = self._path_list.get_path_fid(path, update=False)
+                file_list.append(File(file_id, path))
+                if file_id:
+                    file_list_.append(File(file_id, path))
+            elif path.parent == target_path.parent:
+                file_id = self.rename(path, target_path.name)
+                file_list.append(File(file_id, path))
                 self._print.print_line()
-                return _
-        elif path.parent == target_path.parent:
-            self.rename(path, target_path.name)
+                continue
+            elif not parent_file_id:
+                raise FileNotFoundError(target_path)
+        file_list.extend(self.move_by_file_id_list(file_list_, parent_file_id))
+        if file_list_:
+            for file in file_list_:
+                if file:
+                    if file.file_id:
+                        self._print.move_info(file.path, target_path, status=True)
+                        self._path_list._tree.remove_node(file.file_id)
+                        self._path_list.update_path_list(Path(target_path) / file.path.name, is_fid=False)
+                    else:
+                        self._print.move_info(file.path, target_path, status=False)
+                    self._print.print_line()
+        return file_list
 
-    def mkdir(self, path, name=None, parent_file_id=None):
-        file_id_list = []
+    def move_by_path(self, path, target_path):
+        return self.move_by_path_list([path], target_path)
+
+    def move_by_file_id_list(self, file_list, parent_file_id):
+        return self._disk.move_file(file_list, parent_file_id)
+
+    def move_share_file(self, path: str, target_path: AliyunpanPath) -> List[File]:
+        parent_file_id = 'root'
+        if path == '..':
+            target_path = target_path / self._disk._share.share_id
+            file_list = self.mkdir(target_path)
+            if not file_list:
+                raise CreateDirError
+            parent_file_id = file_list[0].file_id
+        path_list = self.get_path_list()
+        file_list = self._disk.move_file([File(i.id, target_path / i.name) for i in path_list],
+                                         parent_file_id)
+        for file in file_list:
+            for path in path_list:
+                if file.file_id == path.id:
+                    self._print.move_info(path.name, target_path, status=True)
+                    self._path_list.update_path_list(path.name, is_fid=False)
+                    self._print.print_line()
+        return file_list
+
+    def mv(self, path, target_path) -> List[File]:
+        return self.move_by_path(path, target_path)
+
+    def mkdir(self, path, name=None, parent_file_id=None) -> List[File]:
+        file_list: List[File] = []
         if not self.file_filter(path):
-            return False
+            return []
         if not parent_file_id or not name:
             path = AliyunpanPath(path)
             name = path.name
             if str(path) == 'root':
-                return file_id_list
+                return file_list
             file_id = self._path_list.get_path_fid(path, update=False)
             if file_id and file_id != 'root':
-                return file_id_list
+                return file_list
             parent_file_id = self._path_list.get_path_fid(path.parent, update=False)
             if not parent_file_id:
-                file_id_list.extend(self.mkdir(path.parent))
-                parent_file_id, _ = file_id_list[-1]
+                file_list.extend(self.mkdir(path.parent))
+                parent_file_id, _ = file_list[-1]
         r = self._disk.create_file(name, parent_file_id)
         try:
             file_id = r.json()['file_id']
         except KeyError:
             logger.debug(r.json()['message'])
-            return False
+            return []
         if file_id:
             self._print.mkdir_info(path, status=True)
             self._print.print_line()
             self._path_list._tree.create_node(tag=name, identifier=file_id, parent=parent_file_id,
                                               data=FileInfo(name=name, type=False, id=file_id, pid=parent_file_id))
-            file_id_list.append((file_id, path))
-        return file_id_list
+            file_list.append(File(file_id, path))
+        return file_list
 
     def file_filter(self, path, whitelist=None):
         if not path:
@@ -387,7 +431,6 @@ class Commander:
         upload_path = AliyunpanPath(upload_path)
         folder_list = []
         file_list = []
-        file_id_list = None
         for share_info in share_info_list:
             path = share_info.path
             if str(upload_path) in ('', '.') and str(path) == 'root':
@@ -396,11 +439,12 @@ class Commander:
                 upload_path = AliyunpanPath()
             p = upload_path / path
             if str(p) not in ('', '.'):
-                file_id_list = self.mkdir(upload_path / path)
-            if file_id_list:
-                for file_id, path in file_id_list:
+                file_list = self.mkdir(upload_path / path)
+            if file_list:
+                for file_id, path in file_list:
                     folder_list.append((file_id, upload_path / path))
         folder_list = list(set(folder_list))
+        file_list = []
         for share_info in share_info_list:
             share_info: ShareInfo
             path = share_info.path
@@ -410,7 +454,7 @@ class Commander:
             result = self._disk.save_share_link(share_info.name, share_info.content_hash, share_info.proof_code,
                                                 share_info.content_hash_name, share_info.size, parent_file_id, force)
             p = AliyunpanPath(upload_path / path / share_info.name)
-            file_list.append((result, p))
+            file_list.append(File(result, p))
             self._print.print_line()
             if result:
                 self._print.upload_info(p, status=True, rapid_upload=True)

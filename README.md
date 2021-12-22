@@ -113,7 +113,7 @@ EOF
 * 查看帮助
 
 ```shell
-python main.py -h
+aliyunpan-cli -h
 ```
 
 <details>
@@ -191,7 +191,7 @@ python main.py -h
 * 查看指令参数
 
 ```shell
-python main.py COMMAND -h
+aliyunpan-cli COMMAND -h
 ```
 
 <details>
@@ -382,25 +382,25 @@ aliyunpan://示例文件.txt|F61851825609372B3D7F802E600B35A497CFC38E|url_base64
 2.文件分享
 
 ```shell
-python main.py share 示例文件.txt 
+aliyunpan-cli share 示例文件.txt 
 ```
 
 导入
 
 ```shell
-python main.py upload "aliyunpan://示例文件.txt|F61851825609372B3D7F802E600B35A497CFC38E|url_base64|24|root"
+aliyunpan-cli upload "aliyunpan://示例文件.txt|F61851825609372B3D7F802E600B35A497CFC38E|url_base64|24|root"
 ```
 
 3.文件夹分享
 
 ```shell
-python main.py share 示例文件夹
+aliyunpan-cli share 示例文件夹
 ```
 
 导入
 
 ```shell
-python main.py upload -s "aliyunpan://示例文件夹|80E7E25109D4246653B600FDFEDD8D8B0D97E517|url_base64|970|root"
+aliyunpan-cli upload -s "aliyunpan://示例文件夹|80E7E25109D4246653B600FDFEDD8D8B0D97E517|url_base64|970|root"
 ```
 
 ### TUI按键指南

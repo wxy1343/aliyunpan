@@ -11,7 +11,7 @@ import simplejson
 
 # from aliyunpan.api import ua
 from aliyunpan.api.req import *
-from aliyunpan.api.type import UserInfo, AlibumInfo, Share
+from aliyunpan.api.type import UserInfo, AlibumInfo, Share, File
 from aliyunpan.api.utils import *
 from aliyunpan.common import *
 from aliyunpan.exceptions import InvalidRefreshToken, AliyunpanException, AliyunpanCode, LoginFailed, \
@@ -164,7 +164,7 @@ class AliyunPan(object):
         for file_id in file_id_list:
             body = {'file_id': file_id, 'to_parent_file_id': parent_file_id, 'auto_rename': auto_rename}
             file_json = {'body': body,
-                         'headers': {'Content-Type': 'application/json'}, 'id': 0, 'method': 'POST',
+                         'headers': {'Content-Type': 'application/json'}, 'id': "0", 'method': 'POST',
                          'url': '/file/move'}
             file_json_list.append(file_json)
         if self._share.share_id:
@@ -173,6 +173,7 @@ class AliyunPan(object):
                 file_json_list[i]['body']['to_drive_id'] = self.drive_id
                 file_json_list[i]['body']['share_id'] = self._share.share_id
                 file_json_list[i]['url'] = '/file/copy'
+                file_json_list[i]['id'] = file_json_list[i]['body']['file_id']
             headers['x-share-token'] = self.get_share_token()
         else:
             url = 'https://api.aliyundrive.com/v2/batch'
@@ -182,21 +183,24 @@ class AliyunPan(object):
         json = {'requests': file_json_list, 'resource': "file"}
         return self._req.post(url, json=json, headers=headers)
 
-    def move_file(self, file_id: List[str], parent_file_id: str):
+    def move_file(self, file_list: List[File], parent_file_id: str) -> List[File]:
         """
         移动文件
-        :param file_id:
+        :param file_list:
         :param parent_file_id:
         :return:
         """
-        logger.info(f'Move files {file_id} to {parent_file_id}')
-        r = self.batch([file_id], parent_file_id)
+        logger.info(f'Move files {file_list} to {parent_file_id}')
+        r = self.batch([i.file_id for i in file_list], parent_file_id)
         if r.status_code == 200:
-            if 'message' in r.json()['responses'][0]['body']:
-                print(r.json()['responses'][0]['body']['message'])
-                return False
-            return r.json()['responses'][0]['id']
-        return False
+            for i, j in enumerate(r.json()['responses']):
+                file_id = j['id']
+                if file_id:
+                    file_list[i].file_id = file_id
+                else:
+                    del file_list[i]
+            return file_list
+        return []
 
     def update_file(self, file_id: str, name: str):
         """
@@ -670,7 +674,7 @@ class AliyunPan(object):
         return url
 
     def save_share_link(self, name: str, content_hash: str, proof_code: str, content_hash_name: str, size: str,
-                        parent_file_id: str = 'root', force: bool = False) -> bool:
+                        parent_file_id: str = 'root', force: bool = False) -> str:
         """
         保存分享文件
         :param content_hash_name:
@@ -691,7 +695,7 @@ class AliyunPan(object):
         elif 'message' in r.json():
             logger.debug(r.json())
             print(r.json()["message"])
-        return False
+        return ''
 
     def search(self, query: str, raw=False, next_marker: str = None, limit_num: int = 100, limit: bool = False,
                category_list=None):

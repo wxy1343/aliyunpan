@@ -1,6 +1,7 @@
 from collections import namedtuple
+from pathlib import Path
 
-__all__ = ['FileInfo', 'UserInfo', 'ShareInfo', 'AlibumInfo', 'Share']
+__all__ = ['FileInfo', 'UserInfo', 'ShareInfo', 'AlibumInfo', 'Share', 'File']
 
 _file_info = (
     'name', 'id', 'pid', 'type', 'ctime', 'update_time', 'hidden', 'category', 'content_type', 'size',
@@ -26,3 +27,22 @@ class Share:
         self.share_id = share_id
         self.share_pwd = share_pwd
         self.share_token = share_token
+
+
+class File:
+    def __init__(self, file_id: str, path: Path):
+        self.file_id = file_id
+        self.path = path
+
+    def __getitem__(self, item):
+        if item == 0:
+            return self.file_id
+        elif item == 1:
+            return self.path
+        return getattr(self, item)
+
+    def __iter__(self):
+        return iter((self.file_id, self.path))
+
+    def __str__(self):
+        return f'{self.file_id} -> {self.path}'
