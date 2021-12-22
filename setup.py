@@ -47,7 +47,7 @@ setup(
         'Programming Language :: Python :: 3 :: Only',
     ],
     keywords='aliyunpan, aliyundrive, cli, tui',
-    py_modules=["main"],
+    py_modules=["aliyunpan"],
     packages=['aliyunpan', 'aliyunpan/api', 'aliyunpan/cli', 'dlnap/dlnap'],
     python_requires='>=3.6, <4',
     install_requires=install_requires,
