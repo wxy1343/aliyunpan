@@ -18,7 +18,10 @@ class Config:
                            lambda self, value: setattr(self, '_config_file', Path(value)))
 
     def read(self):
-        if not self._config_file or not self._config_file.is_file():
+        try:
+            if not self._config_file or not self._config_file.is_file():
+                return {}
+        except TypeError:
             return {}
         with self.config_file.open(encoding='utf-8') as f:
             return yaml.load(f) or {}
@@ -30,10 +33,13 @@ class Config:
             except FileNotFoundError:
                 pass
             return
-        if not self._config_file or not self._config_file.is_file():
-            if not self._config_file.parent.is_dir():
-                self._config_file.parent.mkdir(parents=True)
-            self._config_file.touch()
+        try:
+            if not self._config_file or not self._config_file.is_file():
+                if not self._config_file.parent.is_dir():
+                    self._config_file.parent.mkdir(parents=True)
+                self._config_file.touch()
+        except TypeError:
+            return
         if isinstance(conf, DATA):
             conf = conf.to_dict()
         with self.config_file.open('w', encoding='utf-8') as f:
