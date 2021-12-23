@@ -56,8 +56,8 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'aliyunpan-cli=main:main',
-            'aliyunpan=main:main',
+            'aliyunpan-cli=aliyunpan.main:main',
+            'aliyunpan=aliyunpan.main:main',
         ],
     },
     project_urls={

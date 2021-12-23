@@ -60,7 +60,7 @@ jobs:
         run: echo "##[set-output name=name;]$(echo aliyunpan-cli-${{ runner.os }}-$(arch)-${{ steps.tag.outputs.name }})"
 
       - name: run pyinstaller
-        run: pyinstaller -F aliyunpan.py -n aliyunpan-cli
+        run: pyinstaller -F aliyunpan/main.py -n aliyunpan-cli
 
       - run: |
           chmod +x dist/*
