@@ -747,7 +747,7 @@ class AliyunPan(object):
         if 'code' in r.json() and r.json()['code'] == AliyunpanCode.not_found_file:
             return {}
         play_dict = {}
-        if 'template_list' in r.json():
+        if 'template_list' in r.json() and r.json()['template_list']:
             for i in r.json()['template_list']:
                 if i['status']:
                     try:

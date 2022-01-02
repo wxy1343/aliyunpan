@@ -212,12 +212,13 @@ def parse_share_url(url, access_token):
 
 class AliyunpanPath(type(Path())):
     def __str__(self):
-        path = [i for i in str(PurePosixPath(Path(super().__str__()).as_posix())).split('/') if i != '']
+        p = super().__str__()
+        path = [i for i in str(PurePosixPath(Path(p).as_posix())).split('/') if i != '']
         if not path:
             path = ['root']
         if len(path) != 1 and path[0] == 'root':
             path = path[1:]
-        path = '/'.join(path)
+        path = ('/' if p[0] in ['/', '\\'] else '') + '/'.join(path)
         return path
 
     def split(self):
@@ -246,3 +247,7 @@ class AliyunpanPath(type(Path())):
 
     def __add__(self, other):
         return Path(self.__str__()) / Path(str(other))
+
+
+if __name__ == '__main__':
+    print(AliyunpanPath('/a/b/c') + AliyunpanPath('1'))

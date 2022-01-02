@@ -63,6 +63,7 @@ class Req:
                 del kwargs['access_token']
             else:
                 kwargs['headers']['Authorization'] = self._disk.access_token if self._disk else GLOBAL_VAR.access_token
+            logger.debug(f'{method.lower()}, {args}, {kwargs}')
             r = getattr(self._session, method.lower())(*args, **kwargs)
             try:
                 logger.debug(r.status_code)
