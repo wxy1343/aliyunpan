@@ -150,9 +150,9 @@ class PathList:
         return [i.data for i in self._tree.children(file_id)]
 
     def get_path_fid(self, path, file_id='root', update=True):
-        path = AliyunpanPath(path)
         if str(path) in ('', '/', '\\', '.', 'root'):
             return 'root'
+        path = AliyunpanPath(path)
         flag = False
         path_list = list(filter(None, path.split()))
         if path_list[0] == 'root':
@@ -248,6 +248,7 @@ class AliyunpanPath(type(Path())):
     def __add__(self, other):
         return Path(self.__str__()) / Path(str(other))
 
-
-if __name__ == '__main__':
-    print(AliyunpanPath('/a/b/c') + AliyunpanPath('1'))
+    @property
+    def parent(self):
+        p = self.__str__().rsplit('/', 1)[0]
+        return p if p else '/'
