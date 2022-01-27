@@ -250,5 +250,6 @@ class AliyunpanPath(type(Path())):
 
     @property
     def parent(self):
-        p = self.__str__().rsplit('/', 1)[0]
-        return p if p else '/'
+        p = self.__str__()
+        p_ = p.rsplit('/', 1)[0]
+        return 'root' if p_ == p else p_
