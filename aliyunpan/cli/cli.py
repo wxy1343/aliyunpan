@@ -689,14 +689,14 @@ class Commander:
     def sync_local(self, sync_path, save_path, sync_time, chunk_size, delete, **kwargs):
         if not save_path:
             save_path = '.'
-        path = AliyunpanPath(save_path) + AliyunpanPath(sync_path)
+        path = AliyunpanPath(save_path) + AliyunpanPath(sync_path).name
         if not path.exists():
             self.download(sync_path, save_path)
         file_id = self.path_list.get_path_fid(sync_path, update=False)
         if not file_id:
             raise FileNotFoundError(sync_path)
         self._path_list.update_path_list(sync_path, is_fid=False)
-        path_ = self._path_list._tree.to_dict(file_id, with_data=True)[str(AliyunpanPath(sync_path))]
+        path_ = self._path_list._tree.to_dict(file_id, with_data=True)[str(AliyunpanPath(sync_path)).name]
         change_file_list = self._path_list.check_path_diff(path, path_['children'] if 'children' in path_ else [])
         for path_ in change_file_list:
             p = str(AliyunpanPath(path_) - AliyunpanPath(save_path))
