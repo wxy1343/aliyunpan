@@ -1,6 +1,8 @@
 import base64
 import sys
 import time
+from enum import IntFlag, auto
+
 from pathlib import Path, PurePosixPath
 
 from treelib import Tree
@@ -11,6 +13,11 @@ from aliyunpan.api.utils import get_sha1, get_url_byte, get_proof_code
 from aliyunpan.common import GetFileListBar
 
 _all_ = ['PathList', 'parse_share_url', 'AliyunpanPath']
+
+
+class DiffFileMethod(IntFlag):
+    SHA1 = auto()
+    SIZE = auto()
 
 
 class PathList:
@@ -57,7 +64,20 @@ class PathList:
             get_file_list_bar.refresh_line()
         return True
 
-    def check_path_diff(self, local_path, disk_path_list):
+    def check_file_diff(self, local_path, remote_path, method=DiffFileMethod.SHA1):
+        assert local_path.is_file()
+        name, file_info = list(remote_path.items())[0]
+        remote_file_info = file_info['data']
+        local_file_info = local_path.stat()
+        if method & DiffFileMethod.SIZE:
+            if local_file_info.st_size != remote_file_info.size:
+                return True
+        if method & DiffFileMethod.SHA1:
+            if get_sha1(local_path).lower() != remote_file_info.content_hash.lower():
+                return True
+        return False
+
+    def check_path_diff(self, local_path, disk_path_list, method=DiffFileMethod.SHA1):
         p = Path(local_path)
         change_file_list = []
         for path in p.iterdir():
@@ -70,11 +90,11 @@ class PathList:
                     if Path(path).is_dir() and file_info['data'] and path.is_dir() != file_info['data'].type:
                         if 'children' in file_info:
                             children = file_info['children']
-                            change_file_list.extend(self.check_path_diff(p / name, children))
+                            change_file_list.extend(self.check_path_diff(p / name, children, method))
                         elif list(path.iterdir()):
                             change_file_list.extend(list(path.iterdir()))
                     if file_info and file_info['data'] and path.is_file() == file_info['data'].type:
-                        if path.is_file() and get_sha1(path).lower() != file_info['data'].content_hash.lower():
+                        if path.is_file() and self.check_file_diff(path, path_, method):
                             if i == len(disk_path_list):
                                 change_file_list.append(path)
                             continue
