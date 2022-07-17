@@ -66,9 +66,9 @@ class Commander:
         if config_file:
             if not get_real_path(config_file).is_file():
                 raise ConfigurationFileNotFoundError
-            self._config.config_file = get_real_path(config_file)
+            self._config = Config(get_real_path(config_file))
         elif config_file_list and config_file_list[0]:
-            self._config.config_file = config_file_list[0]
+            self._config = Config(config_file_list[0])
         if self._config.config_file and self._config.get('aria2'):
             aria2 = self._config.get('aria2')
         else:
@@ -83,7 +83,7 @@ class Commander:
             if not password:
                 raise InvalidPassword
             self._disk.login(username, password)
-        elif config_file_list:
+        elif self._config.config_file:
             refresh_token = self._config.get('refresh_token')
             username = self._config.get('username')
             password = self._config.get('password')
