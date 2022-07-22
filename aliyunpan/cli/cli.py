@@ -528,6 +528,7 @@ class Commander:
                 else:
                     self._print.download_info(p)
                     self._print.print_line()
+                    self._path_list.update_path_list(file_node.id)
                     self.download_file(p, file_node.download_url, chunk_size)
                 self._print.print_line()
             else:
