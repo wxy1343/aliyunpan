@@ -10,4 +10,4 @@ RUN chmod 777 /src/aliyunpan.log
 
 WORKDIR /data/
 
-ENTRYPOINT ["python", "/src/main.py"]
+ENTRYPOINT ["python", "/src/aliyunpan.py"]
