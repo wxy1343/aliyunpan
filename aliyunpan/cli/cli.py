@@ -315,7 +315,7 @@ class Commander:
                     share_info = parse_share_url(path, self._disk.access_token)
                     file = self._path_list.get_path_node(share_info.name, update=False)
                     if file and not file.data.type:
-                        path = path.replace(share_info.name, share_info.name + str(int(time.time())))
+                        path = f'{self._share_link}{path.lstrip(self._share_link).split("|")[0]}_{str(int(time.time()))}|{path.split("|", 1)[1]}'
                         share_info = parse_share_url(path, self._disk.access_token)
                     if not self._path_list.get_path_fid(share_info.name, update=False):
                         self.upload_share(share_info)
@@ -617,7 +617,7 @@ class Commander:
                     url = f'{self._share_link}{file.name}|{file.content_hash}|{url_base64}|{file.size}|{parent_file or "root"}'
                     share_txt += url + '\n'
                     share_txt += '导入链接'.center(50, '*') + '\n'
-                    share_txt += f'python main.py upload "{url}"' + '\n\n'
+                    share_txt += f'python aliyunpan.py upload "{url}"' + '\n\n'
                 print(share_txt)
                 GLOBAL_VAR.txt += share_txt
             else:
@@ -635,7 +635,7 @@ class Commander:
             with open(file_name, 'w', encoding='utf-8') as f:
                 f.write(GLOBAL_VAR.txt)
             print('文件导入'.center(50, '*'))
-            print(f'python main.py upload -s {file_name}')
+            print(f'python aliyunpan.py upload -s {file_name}')
             print('链接导入'.center(50, '*'))
             file_id = self.upload(file_name)[0]
             print()
@@ -644,7 +644,7 @@ class Commander:
                 file = self._path_list._tree.get_node(file_id).data
                 url_base64 = base64.b64encode(self.disk.get_download_url(file_id).encode()).decode()
                 url = f'{self._share_link}{Path(path).name}|{file.content_hash}|{url_base64}|{file.size}|root'
-                print(f'python main.py upload -s "{url}"')
+                print(f'python aliyunpan.py upload -s "{url}"')
 
     def tui(self):
         from aliyunpan.cli.tui import AliyunpanTUI
