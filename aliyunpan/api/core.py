@@ -112,13 +112,12 @@ class AliyunPan(object):
             json['marker'] = next_marker
         headers = {}
         kwargs = {}
+        url = 'https://api.aliyundrive.com/adrive/v3/file/list'
         if self._share.share_id:
-            url = 'https://api.aliyundrive.com/adrive/v3/file/list'
             json.update({'share_id': self._share.share_id, 'share_pwd': self._share.share_pwd})
             headers = {'x-share-token': self.get_share_token()}
             kwargs = {'access_token': None}
         else:
-            url = 'https://api.aliyundrive.com/v2/file/list'
             json.update({"drive_id": self.drive_id, 'fields': '*'})
         logger.info(f'Get the list of parent_file_id {parent_file_id}.')
         r = self._req.post(url, json=json, headers=headers, **kwargs)
