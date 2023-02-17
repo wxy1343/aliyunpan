@@ -32,9 +32,6 @@ jobs:
         with:
           python-version: 3.9.7
 
-      - uses: kenchan0130/actions-system-info@master
-        id: system-info
-
       - name: Declare some variables
         id: vars
         shell: bash
